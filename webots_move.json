@@ -1,0 +1,10 @@
+{
+  "turn": 1,
+  "player": "Black",
+  "move": "g8f6",
+  "from": "g8",
+  "to": "f6",
+  "instruction": "[ACTION 1] GRIPPER: PICK BLACK PIECE AT g8 -> PLACE AT f6",
+  "protocol": "MOVE g8 f6",
+  "timestamp": 1792953424.821454
+}

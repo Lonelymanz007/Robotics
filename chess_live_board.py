@@ -378,13 +378,14 @@ def order_corners_90deg(corners, orientation=0, dest_size=800):
         # White at Bottom: Rank 1 ล่าง / Rank 8 บน (a8=tl, h8=tr, h1=br, a1=bl)
         src_ordered = [c_tl, c_tr, c_br, c_bl]
     elif orientation == 1:
-        # White at Left: Rank 1 ซ้าย / Rank 8 ขวา
-        src_ordered = [c_br, c_tr, c_tl, c_bl]
+        # White at Left: Rank 1 ซ้าย / Rank 8 ขวา (File a บน / File h ล่าง)
+        # a8 บนขวา -> h8 ล่างขวา -> h1 ล่างซ้าย -> a1 บนซ้าย
+        src_ordered = [c_tr, c_br, c_bl, c_tl]
     elif orientation == 2:
         # White at Top: Rank 1 บน / Rank 8 ล่าง
-        src_ordered = [c_br, c_bl, c_tl, c_tr]
+        src_ordered = [c_bl, c_br, c_tr, c_tl]
     else:
-        # orientation == 3: White at Right (Rank 1 ขวา / Rank 8 ซ้าย, File a บน / File h ล่าง)
+        # orientation == 3: White at Right: Rank 1 ขวา / Rank 8 ซ้าย (File a บน / File h ล่าง)
         # a8 บนซ้าย -> h8 ล่างซ้าย -> h1 ล่างขวา -> a1 บนขวา
         src_ordered = [c_tl, c_bl, c_br, c_tr]
 
@@ -571,13 +572,16 @@ def enforce_chess_rules(board, confidences):
     return cleaned
 
 # ─── 2D Renderer ──────────────────────────────────────────────
-def render_board_2d(board_state, highlight=None, anim=None, status=""):
+def render_board_2d(board_state, highlight=None, anim=None, status="", flip_view=False):
     img = np.full((WIN_H, WIN_W, 3), CLR_BG, dtype=np.uint8)
 
     for r in range(8):
         for c in range(8):
-            x0 = MARGIN + c * CELL_SIZE
-            y0 = MARGIN + r * CELL_SIZE
+            vr = (7 - r) if flip_view else r
+            vc = (7 - c) if flip_view else c
+
+            x0 = MARGIN + vc * CELL_SIZE
+            y0 = MARGIN + vr * CELL_SIZE
             is_light = ((r + c) % 2 == 0)
             clr = CLR_LIGHT if is_light else CLR_DARK
             cv2.rectangle(img, (x0, y0), (x0 + CELL_SIZE, y0 + CELL_SIZE), clr, -1)
@@ -599,23 +603,27 @@ def render_board_2d(board_state, highlight=None, anim=None, status=""):
                 blit_alpha(img, get_piece_icon(piece_id), cx, cy)
 
     if anim:
-        blit_alpha(img, get_piece_icon(anim['piece']), anim['cur_px'][0], anim['cur_px'][1])
         sp = anim['src_px']; dp = anim['dst_px']; t = anim['progress']
-        ep = (int(sp[0] + (dp[0] - sp[0]) * t), int(sp[1] + (dp[1] - sp[1]) * t))
-        if sp != ep:
-            cv2.arrowedLine(img, sp, ep, CLR_ARROW, 3, tipLength=0.25)
+        if flip_view:
+            sp = (MARGIN + BOARD_SIZE - (sp[0] - MARGIN), MARGIN + BOARD_SIZE - (sp[1] - MARGIN))
+            dp = (MARGIN + BOARD_SIZE - (dp[0] - MARGIN), MARGIN + BOARD_SIZE - (dp[1] - MARGIN))
+        cur_px = (int(sp[0] + (dp[0] - sp[0]) * t), int(sp[1] + (dp[1] - sp[1]) * t))
+        blit_alpha(img, get_piece_icon(anim['piece']), cur_px[0], cur_px[1])
+        if sp != dp:
+            cv2.arrowedLine(img, sp, dp, CLR_ARROW, 3, tipLength=0.25)
 
     cv2.rectangle(img, (MARGIN, MARGIN), (MARGIN + BOARD_SIZE, MARGIN + BOARD_SIZE), (60, 60, 60), 1)
 
     for i in range(8):
-        rank = str(8 - i)
+        rank = str(1 + i) if flip_view else str(8 - i)
         cv2.putText(img, rank, (MARGIN // 2 - 4, MARGIN + i * CELL_SIZE + CELL_SIZE // 2 + 5),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.42, CLR_TEXT, 1)
-        file_c = chr(ord('a') + i)
+        file_c = chr(ord('h') - i) if flip_view else chr(ord('a') + i)
         cv2.putText(img, file_c, (MARGIN + i * CELL_SIZE + CELL_SIZE // 2 - 5, MARGIN + BOARD_SIZE + MARGIN // 2 + 4),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.42, CLR_TEXT, 1)
 
-    cv2.putText(img, status, (MARGIN, WIN_H - 12),
+    view_tag = " [VIEW: BLACK BOTTOM]" if flip_view else ""
+    cv2.putText(img, f"{status}{view_tag}", (MARGIN, WIN_H - 12),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.40, (160, 220, 160), 1)
 
     return img
@@ -678,7 +686,7 @@ def is_plausible_chess_move(piece, sr, sc, dr, dc):
 
     return False
 
-def animate_move(board_2d, src_rc, dst_rc, win_name, frames=20, delay=16):
+def animate_move(board_2d, src_rc, dst_rc, win_name, frames=20, delay=16, flip_view=False):
     sr, sc = src_rc; dr, dc = dst_rc
     piece = board_2d[sr][sc]
     if not piece: return
@@ -693,7 +701,8 @@ def animate_move(board_2d, src_rc, dst_rc, win_name, frames=20, delay=16):
         t = f / float(frames)
         cur_px = (int(sp[0] + (dp[0] - sp[0]) * t), int(sp[1] + (dp[1] - sp[1]) * t))
         anim_data = {'piece': piece, 'src_px': sp, 'dst_px': dp, 'cur_px': cur_px, 'progress': t}
-        frame = render_board_2d(board_2d, highlight=(src_rc, dst_rc), anim=anim_data, status=f"Move: {src_sq}->{dst_sq}")
+        frame = render_board_2d(board_2d, highlight=(src_rc, dst_rc), anim=anim_data,
+                                status=f"Move: {src_sq}->{dst_sq}", flip_view=flip_view)
         cv2.imshow(win_name, frame)
         if cv2.waitKey(delay) & 0xFF == ord('q'): break
 
@@ -738,22 +747,42 @@ def main():
             corners[:, 1] *= scale_y
             print(f"[INFO] Auto-scaled corners → {fw}x{fh}")
 
-        # ตรวจสอบทิศทางกระดานอัตโนมัติจากตำแหน่งของหมากขาว/ดำ
-        if not os.path.exists(ORIENTATION_CONFIG_FILE):
-            orientation = auto_detect_orientation_from_board(test_frame, corners)
+    # ตรวจสอบ CLI Arguments
+    assume_mode = 1
+    flip_cli = False
+    auto_orient_cli = False
+    flip_view_2d = False
+
+    args_lower = [a.lower() for a in sys.argv[1:]]
+    if '0' in args_lower:
+        assume_mode = 0
+    elif '1' in args_lower:
+        assume_mode = 1
+
+    if any(a in args_lower for a in ('flip', '--flip', '-f', 'reverse')):
+        flip_cli = True
+    if any(a in args_lower for a in ('auto', '--auto', '-a')):
+        auto_orient_cli = True
+    if any(a in args_lower for a in ('black', '--black', '-b', 'view-black')):
+        flip_view_2d = True
+
+    # ตรวจสอบทิศทางกระดานสดจากตำแหน่งของหมากขาว/ดำจริงในกล้อง (ป้องกันการเดินสลับสี 100%)
+    if test_frame is not None:
+        live_orient = auto_detect_orientation_from_board(test_frame, corners)
+        if flip_cli:
+            orientation = (live_orient + 2) % 4
             save_orientation(orientation)
-            print(f"🧭 [AUTO-ORIENT] ตรวจพบทิศทางกระดานอัตโนมัติ: {ORIENTATIONS[orientation]}")
+            print(f"🔄 [CLI FLIP] สลับทิศทางกระดานกลับด้าน 180°: {ORIENTATIONS[orientation]}")
         else:
-            print(f"🧭 [ORIENT] ทิศทางกระดานปัจจุบัน: {ORIENTATIONS[orientation]} (กด [o] เพื่อหมุน)")
+            orientation = live_orient
+            save_orientation(orientation)
+            print(f"🧭 [AUTO-ORIENT] ตรวจพบตำแหน่งหมากจริง: {ORIENTATIONS[orientation]}")
+    else:
+        print(f"🧭 [ORIENT] ทิศทางกระดานปัจจุบัน: {ORIENTATIONS[orientation]} (กด [f] เพื่อสลับ 180°)")
 
     # โหลดค่า Zoom เริ่มต้น (1.0x ถึง 4.0x)
     zoom_factor = load_zoom()
     print(f"[CAMERA] กำลังขยาย Zoom: {zoom_factor:.1f}x (กด [z]/[x] เพื่อซูมกล้องเข้า/ออก)")
-
-    # โหมดเริ่มต้น: 1 = Assume Initial Setup (32 ตัวพร้อมเล่น), 0 = สแกนจากกล้องสด
-    assume_mode = 1
-    if len(sys.argv) > 1 and sys.argv[1] in ('0', '1'):
-        assume_mode = int(sys.argv[1])
 
     if assume_mode == 1:
         board_2d = [row[:] for row in STANDARD_INITIAL_BOARD]
@@ -788,10 +817,13 @@ def main():
     print("=" * 68)
     print(" Hybrid Chess Pipeline v12 (Perfect Square 90° + Multi-Orientation)")
     print(" 🟩 กรอบเขียว: Perfect Square 90° (จัตุรัสสมบูรณ์แบบ 1:1)")
-    print(f" 🧭 ทิศทางกระดาน: {ORIENTATIONS[orientation]} (กด [o] เพื่อหมุนทิศ)")
-    print(" 🔢 กดปุ่ม [1]: เซ็ต Assume ตำแหน่งเริ่มต้นมาตรฐาน (เริ่มเทียบจาก Initial State)")
-    print(" 🔢 กดปุ่ม [0]: สลับเป็นโหมดสแกนหาหมากทั้งกระดานจากกล้องสด")
-    print(" ⚡ เมื่อขยับหมากเสร็จ: กดปุ่ม [Spacebar] เพื่อสแกนและอัปเดตตารางดิจิทัลให้ตรงกับของจริง")
+    print(f" 🧭 ทิศทางกระดาน: {ORIENTATIONS[orientation]}")
+    print(" 🔄 [f]     : กลับด้านกระดาน 180° ทันที (ขวา ⇋ ซ้าย / ล่าง ⇋ บน)")
+    print(" 🔄 [F / v] : สลับมุมมองกระดาน 2D (มุมมองฝั่งขาว ⇋ ฝั่งดำ)")
+    print(" 🧭 [u]     : สแกนตรวจสอบทิศทางกระดานอัตโนมัติจากสีหมาก (Auto-Orient)")
+    print(" 🧭 [o]     : หมุนทิศทางกระดาน 90° (ล่าง -> ซ้าย -> บน -> ขวา)")
+    print(" 🔢 [1 / 0] : โหมดเริ่มต้นมาตรฐาน (1) / โหมดสแกนสดจากกล้อง (0)")
+    print(" ⚡ เมื่อขยับหมากเสร็จ: กดปุ่ม [Spacebar] เพื่อสแกนและอัปเดตตารางดิจิทัล")
     print(" [z / x] : ซูมกล้องเข้า / ออก (+/- 0.1x) เพื่อไม่ต้องยก iPhone สูงเกินไป")
     print(" [Z / X] : ซูมกล้องเข้า / ออก ขั้นใหญ่ (+/- 0.5x)")
     print(" [t]     : สลับตาเดินหมากด้วยมือ (White ⇋ Black)")
@@ -799,10 +831,8 @@ def main():
     print(" [a / d] : เลื่อนกรอบจัตุรัส ซ้าย / ขวา")
     print(" [+ / -] : ขยาย / ย่อ ขนาดกรอบจัตุรัส (คงรูปทรงจัตุรัส 90° เสมอ)")
     print(" [p]     : บังคับรีเซ็ตกรอบเป็น สี่เหลี่ยมจัตุรัส 1:1 ทันที")
-    print(" [o]     : หมุนทิศทางกระดาน 90° (ล่าง -> ซ้าย -> บน -> ขวา)")
     print(" [c]     : Calibrate 4 มุมขอบกระดานสดๆ บนจอกล้อง")
-    print(" [r]     : รีเซ็ตกระดาน 2D ให้ว่างเปล่า")
-    print(" [q]     : ออกจากโปรแกรม")
+    print(" [r]     : รีเซ็ตกระดาน 2D ให้ว่างเปล่า | [q] : ออกจากโปรแกรม")
     print("=" * 68)
 
     drop_count = 0
@@ -1103,7 +1133,7 @@ def main():
                         src_name = f"{chr(ord('a')+sc)}{8-sr}"
                         dst_name = f"{chr(ord('a')+dc)}{8-dr}"
                         print(f"\n⚡ [MOVE SYNCED] {moved_p}: {src_name} -> {dst_name}")
-                        animate_move(board_2d, (sr, sc), (dr, dc), win_2d)
+                        animate_move(board_2d, (sr, sc), (dr, dc), win_2d, flip_view=flip_view_2d)
 
                         # 👉 อัปเดตเฉพาะช่องที่ขยับจริง (ช่องอื่นทั้ง 63 ช่องคงเดิม 100%)
                         board_2d[dr][dc] = moved_p
@@ -1132,7 +1162,7 @@ def main():
             badge_txt = "STATE: [INITIALIZING] Verifying Start Board..."
             badge_col = (255, 200, 0)
         cv2.putText(cam_display, badge_txt, (30, 45), cv2.FONT_HERSHEY_SIMPLEX, 0.65, badge_col, 2)
-        orient_txt = f"ORIENT: {ORIENTATIONS[orientation].split(' (')[0]} [o: Rotate | p: Square]"
+        orient_txt = f"ORIENT: {ORIENTATIONS[orientation].split(' (')[0]} [f: Flip 180 | o: Rotate | u: Auto]"
         cv2.putText(cam_display, orient_txt, (30, 75), cv2.FONT_HERSHEY_SIMPLEX, 0.50, (0, 255, 255), 2)
         zoom_txt = f"ZOOM: {zoom_factor:.1f}x [z: In | x: Out] | [w/s/a/d: Move | +/-: Size]"
         cv2.putText(cam_display, zoom_txt, (30, 105), cv2.FONT_HERSHEY_SIMPLEX, 0.50, (0, 255, 120), 2)
@@ -1143,7 +1173,7 @@ def main():
         else:
             status_prefix = "[LOCKED]" if is_locked else "[SCANNING]"
             display_status = f"{status_prefix} {last_status_msg}"
-        board_render = render_board_2d(board_2d, status=display_status)
+        board_render = render_board_2d(board_2d, status=display_status, flip_view=flip_view_2d)
         cv2.imshow(win_2d, board_render)
 
         cam_h, cam_w = cam_display.shape[:2]
@@ -1154,6 +1184,12 @@ def main():
             break
         elif key == ord('1'):
             # ตั้งค่า Assume ว่าทุกตัวอยู่ในตำแหน่งเริ่มต้นทันที (Mode 1)
+            live_orient = auto_detect_orientation_from_board(frame, corners)
+            if live_orient != orientation:
+                orientation = live_orient
+                save_orientation(orientation)
+                print(f"🧭 [AUTO-ORIENT] อัปเดตทิศทางกระดานให้ตรงกับหมากจริง: {ORIENTATIONS[orientation]}")
+
             board_2d = [row[:] for row in STANDARD_INITIAL_BOARD]
             has_initial_render = True
             is_locked = True
@@ -1163,6 +1199,7 @@ def main():
             last_status_msg = "[SYNCED] Mode 1: Assumed standard initial setup! Press [Space] after move."
             print("\n" + "=" * 68)
             print("✅ [MODE 1] เซ็ต Assume หมากทั้ง 32 ตัวอยู่ในตำแหน่งเริ่มต้นเรียบร้อย")
+            print(f"🧭 ทิศทางกระดาน: {ORIENTATIONS[orientation]}")
             print("⚪ พร้อมเทียบความเปลี่ยนแปลง: ขยับหมากแล้วกด [Spacebar] เพื่ออัปเดตตารางดิจิทัล")
             print("=" * 68 + "\n")
         elif key in (ord('t'), ord('T')):
@@ -1292,6 +1329,25 @@ def main():
             ], dtype=np.float32)
             save_corners(corners)
             print(f"🟩 [SQUARE] ปรับเป็นสี่เหลี่ยมจัตุรัสสมบูรณ์แบบ (1:1) ขนาด {side:.0f}x{side:.0f} เรียบร้อย!")
+        elif key in (ord('f'),):
+            # กลับด้านกระดาน 180 องศาทันที (Flip Board 180°: ขวา ⇋ ซ้าย หรือ ล่าง ⇋ บน)
+            orientation = (orientation + 2) % 4
+            save_orientation(orientation)
+            last_status_msg = f"[FLIPPED 180°] {ORIENTATIONS[orientation].split(' (')[0]}"
+            print(f"\n🔄 [FLIP 180°] กลับด้านกระดาน 180 องศาเป็น: {ORIENTATIONS[orientation]}")
+        elif key in (ord('F'), ord('v'), ord('V')):
+            # สลับมุมมองกระดาน 2D (ขาวอยู่ล่าง ⇋ ดำอยู่ล่าง)
+            flip_view_2d = not flip_view_2d
+            view_str = "มุมมองฝั่งดำ (Black Bottom)" if flip_view_2d else "มุมมองฝั่งขาว (White Bottom)"
+            last_status_msg = f"[2D VIEW] {view_str}"
+            print(f"\n🔄 [2D VIEW] สลับมุมมองกระดาน 2D เป็น: {view_str}")
+        elif key in (ord('u'), ord('U')):
+            # Auto-Detect ทิศทางกระดานจากภาพกล้องสดทันที
+            new_orient = auto_detect_orientation_from_board(frame, corners)
+            orientation = new_orient
+            save_orientation(orientation)
+            last_status_msg = f"[AUTO-ORIENT] {ORIENTATIONS[orientation].split(' (')[0]}"
+            print(f"\n🧭 [AUTO-ORIENT] ตรวจพบและตั้งทิศทางกระดานเป็น: {ORIENTATIONS[orientation]}")
         elif key in (ord('o'), ord('O')):
             # หมุนทิศทางกระดาน 90 องศา
             orientation = (orientation + 1) % 4

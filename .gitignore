@@ -1,0 +1,10 @@
+# Compiled Object files
+*.o
+*.pyc
+__pycache__/
+
+# OS artifacts
+.DS_Store
+
+# Temporary outputs
+webots_command.txt

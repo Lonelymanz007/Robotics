@@ -11,20 +11,26 @@
 # **************************************************************************** #
 
 NAME		= robotic_engine
+DYLIB		= libchess_ai.dylib
 
 CC			= cc
 CFLAGS		= -Wall -Wextra -Werror -O2
 RM			= rm -f
 
 SRCS		= main.c board.c moves.c ai.c display.c
+DYLIB_SRCS	= engine_api.c board.c moves.c ai.c display.c
 OBJS		= $(SRCS:.c=.o)
 HEADERS		= robotic.h
 
-all:		$(NAME)
+all:		$(NAME) $(DYLIB)
 
 $(NAME):	$(OBJS)
 			$(CC) $(CFLAGS) $(OBJS) -o $(NAME)
 			@echo "\033[1;32m[✓] $(NAME) compiled successfully!\033[0m"
+
+$(DYLIB):	$(DYLIB_SRCS) $(HEADERS)
+			$(CC) $(CFLAGS) -shared -fPIC $(DYLIB_SRCS) -o $(DYLIB)
+			@echo "\033[1;32m[✓] $(DYLIB) compiled successfully!\033[0m"
 
 %.o:		%.c $(HEADERS)
 			$(CC) $(CFLAGS) -c $< -o $@
@@ -34,8 +40,8 @@ clean:
 			@echo "\033[1;33m[✓] Object files cleaned.\033[0m"
 
 fclean:		clean
-			$(RM) $(NAME)
-			@echo "\033[1;31m[✓] Binary $(NAME) removed.\033[0m"
+			$(RM) $(NAME) $(DYLIB)
+			@echo "\033[1;31m[✓] Binaries removed.\033[0m"
 
 re:			fclean all
 
