@@ -572,8 +572,20 @@ def enforce_chess_rules(board, confidences):
     return cleaned
 
 # ─── 2D Renderer ──────────────────────────────────────────────
-def render_board_2d(board_state, highlight=None, anim=None, status="", flip_view=False):
+def render_board_2d(board_state, highlight=None, anim=None, status="", flip_view=False, current_turn='W'):
     img = np.full((WIN_H, WIN_W, 3), CLR_BG, dtype=np.uint8)
+
+    # ── Top Turn Indicator Box (ช่องบอกสถานะตาเดินบนหน้า 2D ชัดเจน) ──
+    turn_str = "WHITE (ขาว)" if current_turn == 'W' else "BLACK (ดำ)"
+    turn_box_bg = (18, 48, 18) if current_turn == 'W' else (50, 25, 25)
+    turn_border = (0, 255, 120) if current_turn == 'W' else (100, 100, 255)
+    turn_txt = f"TURN: {turn_str} | Move piece on board & press [Space]"
+    turn_txt_col = (255, 255, 255) if current_turn == 'W' else (220, 220, 255)
+
+    cv2.rectangle(img, (MARGIN, 6), (WIN_W - MARGIN, 36), turn_box_bg, -1)
+    cv2.rectangle(img, (MARGIN, 6), (WIN_W - MARGIN, 36), turn_border, 2)
+    cv2.putText(img, turn_txt, (MARGIN + 12, 27),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.44, turn_txt_col, 2)
 
     for r in range(8):
         for c in range(8):
@@ -582,7 +594,7 @@ def render_board_2d(board_state, highlight=None, anim=None, status="", flip_view
 
             x0 = MARGIN + vc * CELL_SIZE
             y0 = MARGIN + vr * CELL_SIZE
-            is_light = ((r + c) % 2 == 0)
+            is_light = ((r + c) % 2 != 0)  # สลับ Pattern สีตารางให้ตรงกับกระดานจริง
             clr = CLR_LIGHT if is_light else CLR_DARK
             cv2.rectangle(img, (x0, y0), (x0 + CELL_SIZE, y0 + CELL_SIZE), clr, -1)
 
@@ -686,7 +698,7 @@ def is_plausible_chess_move(piece, sr, sc, dr, dc):
 
     return False
 
-def animate_move(board_2d, src_rc, dst_rc, win_name, frames=20, delay=16, flip_view=False):
+def animate_move(board_2d, src_rc, dst_rc, win_name, frames=20, delay=16, flip_view=False, current_turn='W'):
     sr, sc = src_rc; dr, dc = dst_rc
     piece = board_2d[sr][sc]
     if not piece: return
@@ -702,7 +714,7 @@ def animate_move(board_2d, src_rc, dst_rc, win_name, frames=20, delay=16, flip_v
         cur_px = (int(sp[0] + (dp[0] - sp[0]) * t), int(sp[1] + (dp[1] - sp[1]) * t))
         anim_data = {'piece': piece, 'src_px': sp, 'dst_px': dp, 'cur_px': cur_px, 'progress': t}
         frame = render_board_2d(board_2d, highlight=(src_rc, dst_rc), anim=anim_data,
-                                status=f"Move: {src_sq}->{dst_sq}", flip_view=flip_view)
+                                status=f"Move: {src_sq}->{dst_sq}", flip_view=flip_view, current_turn=current_turn)
         cv2.imshow(win_name, frame)
         if cv2.waitKey(delay) & 0xFF == ord('q'): break
 
@@ -1139,6 +1151,18 @@ def main():
                         board_2d[dr][dc] = moved_p
                         board_2d[sr][sc] = None
 
+                        # 🏰 ตรวจจับการเข้าป้อม (Castling): ขยับเรือ (Rook) ตามด้วย
+                        if moved_p and moved_p[1] == 'K' and abs(sc - dc) == 2:
+                            rook_row = sr
+                            if dc == 6:  # Kingside (O-O)
+                                rook_src = (rook_row, 7); rook_dst = (rook_row, 5)
+                            else:        # Queenside (O-O-O)
+                                rook_src = (rook_row, 0); rook_dst = (rook_row, 3)
+                            animate_move(board_2d, rook_src, rook_dst, win_2d, flip_view=flip_view_2d)
+                            board_2d[rook_dst[0]][rook_dst[1]] = board_2d[rook_src[0]][rook_src[1]]
+                            board_2d[rook_src[0]][rook_src[1]] = None
+                            print(f"🏰 [CASTLING] เข้าป้อมสำเร็จ! ย้ายเรือ {rook_src} -> {rook_dst} เรียบร้อย")
+
                         last_status_msg = f"[SYNCED] Moved {moved_p}: {src_name}->{dst_name} | Waiting for next move"
                         print(f"✅ [SYNCED] อัปเดตตารางดิจิทัลตรงกับโลกจริงเป๊ะๆ แล้ว! เข้าสู่สถานะหยุดรอตาต่อไป")
                     else:
@@ -1173,7 +1197,7 @@ def main():
         else:
             status_prefix = "[LOCKED]" if is_locked else "[SCANNING]"
             display_status = f"{status_prefix} {last_status_msg}"
-        board_render = render_board_2d(board_2d, status=display_status, flip_view=flip_view_2d)
+        board_render = render_board_2d(board_2d, status=display_status, flip_view=flip_view_2d, current_turn=current_turn)
         cv2.imshow(win_2d, board_render)
 
         cam_h, cam_w = cam_display.shape[:2]

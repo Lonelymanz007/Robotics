@@ -57,7 +57,7 @@ bool engine_apply_human_move(const char *move_str)
 		m.to_c = tc;
 		m.moved_piece = g_game.board[fr][fc];
 		m.captured_piece = g_game.board[tr][tc];
-		m.is_castling = false;
+		m.is_castling = (m.moved_piece.type == KING && abs(fc - tc) == 2);
 		m.is_promotion = false;
 		m.promo_piece = EMPTY;
 		make_move(&g_game, &m);

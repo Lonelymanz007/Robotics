@@ -301,6 +301,42 @@ def rescale_corners_for_zoom(corners, old_zoom, new_zoom, fw=1920, fh=1080):
     scaled[:, 1] = np.clip((scaled[:, 1] - cy) * ratio + cy, 0.0, fh)
     return scaled
 
+def auto_detect_orientation_from_board(frame, corners):
+    """
+    ตรวจจับทิศทางกระดานอัตโนมัติจากการกระจายตัวของหมากขาวและหมากดำ:
+    - หาค่าความสว่างของฝั่งซ้าย, ขวา, บน, ล่าง ในกรอบกระดาน
+    - ฝั่งที่มีค่าความสว่างสูงกว่าคือฝั่งของ White (Rank 1-2)
+    คืนค่า orientation (0=ล่าง, 1=ซ้าย, 2=บน, 3=ขวา)
+    """
+    try:
+        x_min = int(np.min(corners[:, 0]))
+        x_max = int(np.max(corners[:, 0]))
+        y_min = int(np.min(corners[:, 1]))
+        y_max = int(np.max(corners[:, 1]))
+        w = x_max - x_min
+        h = y_max - y_min
+        if w < 100 or h < 100:
+            return 3
+
+        roi = frame[y_min:y_max, x_min:x_max]
+        gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+        rh, rw = gray.shape[:2]
+
+        top_bright   = float(np.mean(gray[:rh//4, :]))
+        bot_bright   = float(np.mean(gray[3*rh//4:, :]))
+        left_bright  = float(np.mean(gray[:, :rw//4]))
+        right_bright = float(np.mean(gray[:, 3*rw//4:]))
+
+        horiz_diff = abs(right_bright - left_bright)
+        vert_diff  = abs(bot_bright - top_bright)
+
+        if horiz_diff > vert_diff:
+            return 3 if right_bright > left_bright else 1
+        else:
+            return 0 if bot_bright > top_bright else 2
+    except Exception:
+        return 3
+
 ORIENTATIONS = [
     "White at Bottom (Rank 1 ล่าง / Rank 8 บน)",
     "White at Left (Rank 1 ซ้าย / Rank 8 ขวา)",
@@ -421,14 +457,74 @@ def scan_board_frame(frame, frame_hsv, M, dest_size, kernel_open, kernel_dilate)
     return board, detections, detected_count
 
 # ─── 2D Board Rendering & Animation ───────────────────────────
-def render_board_2d(board_state, highlight=None, anim=None, status="", robot_action="", in_check_color=None):
+def render_board_2d(board_state, highlight=None, anim=None, status="", robot_action="",
+                    in_check_color=None, turn_state="WAITING_HUMAN",
+                    illegal_glow=None, field_alert_squares=None):
     img = np.full((WIN_H + 40, WIN_W, 3), CLR_BG, dtype=np.uint8)
+
+    now = time.time()
+    is_illegal_active = bool(illegal_glow and (now < illegal_glow.get('expire_time', 0)))
+    is_field_alert_active = bool(field_alert_squares)
+
+    # ── Top Turn Indicator Box (ช่องบอกสถานะตาเดินบนหน้า 2D ชัดเจน) ──
+    if is_illegal_active:
+        pulse = 0.5 + 0.5 * np.sin(now * 12.0)
+        box_r = int(120 + 130 * pulse)
+        turn_box_bg = (10, 10, int(40 + 40 * pulse))
+        turn_box_border = (0, 0, box_r)
+        p_name = illegal_glow.get('piece', 'Piece')
+        s_name = illegal_glow.get('src_name', '')
+        d_name = illegal_glow.get('dst_name', '')
+        turn_txt = f"🚨 ILLEGAL MOVE: {p_name} {s_name}->{d_name} | MOVE BACK & RETRY"
+        turn_txt_col = (60, 60, 255)
+    elif is_field_alert_active:
+        pulse = 0.5 + 0.5 * np.sin(now * 9.0)
+        box_g = int(100 + 80 * pulse)
+        turn_box_bg = (15, 30, 55)
+        turn_box_border = (0, box_g, 255)
+        turn_txt = "⚠️ FIELD DESYNC: PIECES MISSING ON PHYSICAL BOARD | RESTORE & PRESS ENTER"
+        turn_txt_col = (0, 215, 255)
+    elif turn_state == 'WAITING_HUMAN':
+        turn_box_bg = (18, 48, 18)
+        turn_box_border = (0, 255, 120)
+        turn_txt = "TURN: WHITE (YOU) | Move piece on board & press [Space] or [Enter]"
+        turn_txt_col = (255, 255, 255)
+    elif turn_state == 'SCANNING_HUMAN':
+        turn_box_bg = (20, 45, 65)
+        turn_box_border = (0, 215, 255)
+        turn_txt = "SCANNING: Verifying White move & rules from camera..."
+        turn_txt_col = (0, 215, 255)
+    elif turn_state == 'WAITING_AI_TRIGGER':
+        turn_box_bg = (15, 45, 65)
+        turn_box_border = (0, 215, 255)
+        turn_txt = "WHITE MOVED -> PRESS [ENTER ONLY] TO VERIFY FIELD & RUN AI"
+        turn_txt_col = (0, 240, 255)
+    elif turn_state in ('ROBOT_THINKING', 'AI_THINKING'):
+        turn_box_bg = (55, 25, 25)
+        turn_box_border = (100, 100, 255)
+        turn_txt = "TURN: BLACK (ROBOT AI) | Thinking Minimax in C..."
+        turn_txt_col = (220, 220, 255)
+    elif turn_state == 'GAME_OVER':
+        turn_box_bg = (20, 20, 60)
+        turn_box_border = (0, 0, 255)
+        turn_txt = "GAME OVER: Match Concluded"
+        turn_txt_col = (255, 255, 255)
+    else:
+        turn_box_bg = (30, 30, 30)
+        turn_box_border = (150, 150, 150)
+        turn_txt = f"TURN: {turn_state}"
+        turn_txt_col = (200, 200, 200)
+
+    cv2.rectangle(img, (MARGIN, 6), (WIN_W - MARGIN, 36), turn_box_bg, -1)
+    cv2.rectangle(img, (MARGIN, 6), (WIN_W - MARGIN, 36), turn_box_border, 2)
+    cv2.putText(img, turn_txt, (MARGIN + 10, 27),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.41, turn_txt_col, 2)
 
     for r in range(8):
         for c in range(8):
             x0 = MARGIN + c * CELL_SIZE
             y0 = MARGIN + r * CELL_SIZE
-            is_light = ((r + c) % 2 == 0)
+            is_light = ((r + c) % 2 != 0)  # สลับ Pattern สีตารางให้ตรงกับกระดานจริง
             clr = CLR_LIGHT if is_light else CLR_DARK
             cv2.rectangle(img, (x0, y0), (x0 + CELL_SIZE, y0 + CELL_SIZE), clr, -1)
 
@@ -451,10 +547,56 @@ def render_board_2d(board_state, highlight=None, anim=None, status="", robot_act
                     cv2.addWeighted(ov, 0.45, img[y0:y0+CELL_SIZE, x0:x0+CELL_SIZE], 0.55, 0,
                                     img[y0:y0+CELL_SIZE, x0:x0+CELL_SIZE])
 
+            # Field Alert Squares (ตรวจพบหมากหายไปจากกระดานจริง - Flashing Amber)
+            if is_field_alert_active and (r, c) in field_alert_squares:
+                pulse_f = 0.5 + 0.5 * np.sin(now * 9.0)
+                alpha_f = 0.45 + 0.35 * pulse_f
+                ov = img[y0:y0+CELL_SIZE, x0:x0+CELL_SIZE].copy()
+                cv2.rectangle(ov, (0, 0), (CELL_SIZE, CELL_SIZE), (0, int(130 + 80 * pulse_f), 255), -1)
+                cv2.addWeighted(ov, alpha_f, img[y0:y0+CELL_SIZE, x0:x0+CELL_SIZE], 1.0 - alpha_f, 0,
+                                img[y0:y0+CELL_SIZE, x0:x0+CELL_SIZE])
+                cv2.rectangle(img, (x0, y0), (x0 + CELL_SIZE, y0 + CELL_SIZE), (0, 160, 255), 3)
+
             if p:
                 cx = x0 + CELL_SIZE // 2
                 cy = y0 + CELL_SIZE // 2
                 blit_alpha(img, get_piece_icon(p), cx, cy)
+
+            if is_field_alert_active and (r, c) in field_alert_squares:
+                cv2.putText(img, "MISSING", (x0 + 6, y0 + CELL_SIZE // 2 + 5),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.38, (255, 255, 255), 2)
+
+    # ── ILLEGAL MOVE GLOW (เรืองแสงสีแดงนีออนกระพริบ เมื่อเดินผิดกฎหมากรุก) ──
+    if is_illegal_active:
+        pulse_i = 0.5 + 0.5 * np.sin(now * 12.0)
+        alpha_i = 0.45 + 0.40 * pulse_i
+        glow_red = (0, 0, int(200 + 55 * pulse_i))
+
+        for sq in (illegal_glow['src'], illegal_glow['dst']):
+            ir, ic = sq
+            ix0 = MARGIN + ic * CELL_SIZE
+            iy0 = MARGIN + ir * CELL_SIZE
+            ov = img[iy0:iy0+CELL_SIZE, ix0:ix0+CELL_SIZE].copy()
+            cv2.rectangle(ov, (0, 0), (CELL_SIZE, CELL_SIZE), glow_red, -1)
+            cv2.addWeighted(ov, alpha_i, img[iy0:iy0+CELL_SIZE, ix0:ix0+CELL_SIZE], 1.0 - alpha_i, 0,
+                            img[iy0:iy0+CELL_SIZE, ix0:ix0+CELL_SIZE])
+            cv2.rectangle(img, (ix0, iy0), (ix0 + CELL_SIZE, iy0 + CELL_SIZE), (0, 0, 255), 3)
+            # Outer neon border
+            cv2.rectangle(img, (ix0 - 2, iy0 - 2), (ix0 + CELL_SIZE + 2, iy0 + CELL_SIZE + 2), (50, 50, 255), 1)
+
+        # Draw red arrow with ILLEGAL badge
+        spx = MARGIN + illegal_glow['src'][1] * CELL_SIZE + CELL_SIZE // 2
+        spy = MARGIN + illegal_glow['src'][0] * CELL_SIZE + CELL_SIZE // 2
+        dpx = MARGIN + illegal_glow['dst'][1] * CELL_SIZE + CELL_SIZE // 2
+        dpy = MARGIN + illegal_glow['dst'][0] * CELL_SIZE + CELL_SIZE // 2
+        cv2.arrowedLine(img, (spx, spy), (dpx, dpy), (0, 0, 255), 4, tipLength=0.25)
+
+        mid_x = (spx + dpx) // 2
+        mid_y = (spy + dpy) // 2
+        cv2.rectangle(img, (mid_x - 48, mid_y - 14), (mid_x + 48, mid_y + 14), (0, 0, 180), -1)
+        cv2.rectangle(img, (mid_x - 48, mid_y - 14), (mid_x + 48, mid_y + 14), (0, 0, 255), 2)
+        cv2.putText(img, "ILLEGAL", (mid_x - 40, mid_y + 6),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.46, (255, 255, 255), 2)
 
     if anim:
         blit_alpha(img, get_piece_icon(anim['piece']), anim['cur_px'][0], anim['cur_px'][1])
@@ -475,8 +617,9 @@ def render_board_2d(board_state, highlight=None, anim=None, status="", robot_act
                     cv2.FONT_HERSHEY_SIMPLEX, 0.42, CLR_TEXT, 1)
 
     # Status Bar
+    status_col = (50, 50, 255) if is_illegal_active else ((0, 200, 255) if is_field_alert_active else (160, 220, 160))
     cv2.putText(img, status, (MARGIN, WIN_H - 14),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.38, (160, 220, 160), 1)
+                cv2.FONT_HERSHEY_SIMPLEX, 0.38, status_col, 1)
 
     # Robot Command / Sim Feed Banner
     if robot_action:
@@ -560,7 +703,7 @@ def execute_robot_turn(c_engine, board_2d, turn_count, win_2d):
 
     return next_state, turn_count, last_status_msg, robot_proto, in_check_color
 
-def animate_move(board_2d, src, dst, win_name, is_robot=False, steps=10, delay_ms=18):
+def animate_move(board_2d, src, dst, win_name, is_robot=False, steps=10, delay_ms=18, turn_state=None):
     sr, sc = src; dr, dc = dst
     p = board_2d[sr][sc]
     if not p: return
@@ -574,6 +717,7 @@ def animate_move(board_2d, src, dst, win_name, is_robot=False, steps=10, delay_m
     board_2d[sr][sc] = None
 
     player_str = "Robot (Black)" if is_robot else "Human (White)"
+    cur_turn = turn_state if turn_state else ("ROBOT_THINKING" if is_robot else "WAITING_HUMAN")
     for step in range(steps + 1):
         t = step / float(steps)
         t_ease = (1.0 - np.cos(t * np.pi)) / 2.0
@@ -589,7 +733,7 @@ def animate_move(board_2d, src, dst, win_name, is_robot=False, steps=10, delay_m
             'is_robot': is_robot
         }
         status_txt = f"[ANIMATING] {player_str} moving {saved}..."
-        frame = render_board_2d(board_2d, highlight=(src, dst), anim=anim, status=status_txt)
+        frame = render_board_2d(board_2d, highlight=(src, dst), anim=anim, status=status_txt, turn_state=cur_turn)
         cv2.imshow(win_name, frame)
         cv2.waitKey(delay_ms)
 
@@ -606,6 +750,54 @@ def square_name_to_rc(sq_str):
 
 def rc_to_square_name(r, c):
     return f"{chr(ord('a')+c)}{8-r}"
+
+# ─── Field Environment Integrity Verification ────────────────
+def verify_field_environment(cap, M, dest_size, kernel_open, kernel_dilate, zoom_factor, board_2d, num_frames=8):
+    """
+    ตรวจสอบสภาพสนามจริงผ่านกล้องสดว่าอยู่ในสภาวะที่ยังเล่นอยู่หรือไม่
+    - ตรวจสอบว่าหมากในความจำ (board_2d) มีตัวไหนถูกยกออกหรือหายไปจากกระดานจริงหรือไม่
+    - หากสภาพสนามเพี้ยน (หมากหาย หรือตำแหน่งไม่ตรงกับความจำ) ระบบจะปฏิเสธการเดินของ AI ทันที
+    คืนค่า: (field_ok: bool, missing_list: list, extra_list: list, msg: str)
+    """
+    frames_boards = []
+    for _ in range(num_frames):
+        ret, f = cap.read()
+        if not ret or f is None:
+            continue
+        if zoom_factor > 1.001:
+            f = apply_camera_zoom(f, zoom_factor)
+        f_hsv = cv2.cvtColor(f, cv2.COLOR_BGR2HSV)
+        inst_b, _, _ = scan_board_frame(f, f_hsv, M, dest_size, kernel_open, kernel_dilate)
+        frames_boards.append(inst_b)
+        time.sleep(0.012)
+
+    if not frames_boards:
+        return False, [], [], "ไม่สามารถอ่านสัญญาณภาพจากกล้องสดเพื่อตรวจสอบสนามได้"
+
+    # นับความถี่ของการตรวจพบหมากในแต่ละช่อง (8x8)
+    hit_counts = [[0]*8 for _ in range(8)]
+    for fb in frames_boards:
+        for r in range(8):
+            for c in range(8):
+                if fb[r][c] is not None:
+                    hit_counts[r][c] += 1
+
+    missing_list = []
+    # ช่องที่มีหมากตามความจำ แต่กล้องไม่พบเลยหรือพบน้อยมาก (<= 1 จาก num_frames)
+    for r in range(8):
+        for c in range(8):
+            exp_p = board_2d[r][c]
+            if exp_p is not None:
+                if hit_counts[r][c] <= 1:
+                    sq_name = rc_to_square_name(r, c)
+                    missing_list.append((r, c, f"{exp_p} ({sq_name})"))
+
+    if missing_list:
+        missing_names = ", ".join([item[2] for item in missing_list])
+        msg = f"หมากหายจากกระดานจริง {len(missing_list)} ตำแหน่ง: [{missing_names}]"
+        return False, missing_list, [], msg
+
+    return True, [], [], "สภาพสนามสมบูรณ์ตรงกับหน่วยความจำ"
 
 # ─── Write Webots Simulation Files ────────────────────────────
 def emit_webots_instruction(move_count, player, from_sq, to_sq, instruction, protocol):
@@ -726,23 +918,28 @@ def main():
 
     # Single Player State Machine
     # STATES:
-    # 'WAITING_HUMAN' -> Human makes move on physical board, presses [Space]
-    # 'SCANNING_HUMAN' -> Camera scans 16 passes, verifies White move
-    # 'WAITING_AI_TRIGGER' -> White move confirmed on 2D, waiting user to press [Enter] to start AI
+    # 'WAITING_HUMAN' -> Human makes move on physical board, presses [Space] or [Enter]
+    # 'SCANNING_HUMAN' -> Camera scans 16 passes, verifies White move & checks chess rules
+    # 'WAITING_AI_TRIGGER' -> White move confirmed on 2D, waiting user to press [Enter] to verify field & start AI
     # 'GAME_OVER' -> Checkmate or Stalemate
     game_state = 'WAITING_HUMAN'
     turn_count = 1
-    last_status_msg = "[HUMAN TURN] White, move a physical piece & press [Space]"
+    last_status_msg = "[HUMAN TURN] White, move a physical piece & press [Space] or [Enter]"
     last_robot_protocol = ""
     in_check_color = None
     scan_passes = []
+    illegal_move_info = None
+    field_alert_squares = []
+    pending_human_move = None
+    auto_trigger_ai_after_scan = False
 
     print("\n" + "=" * 68)
     print(" 🎮 SINGLE PLAYER CHESS PIPELINE (HUMAN vs AI ROBOT)")
     print(" 1. เดินหมากขาวบนกระดานจริง (เช่น Pawn e2 -> e4)")
-    print(" 2. กดปุ่ม [Spacebar] เพื่อสแกนและอัปเดตลงตาราง 2D")
-    print(" 3. 👉 เมื่อจบตาคุณแล้ว ให้กดปุ่ม [Enter] (หรือ Space) เพื่อสั่ง AI เริ่มวิเคราะห์และเดินฝั่งดำ!")
-    print(" 4. C Engine จะส่งคำสั่ง Kinematics ไปยัง Webots Sim และขยับบนกระดาน 2D ทันที")
+    print(" 2. กดปุ่ม [Spacebar] เพื่อสแกนและตรวจสอบกฎ (หรือกด [Enter] เพื่อสแกนและสั่ง AI ทันที)")
+    print(" 3. 🚨 หากเดินผิดกฎหมากรุก ระบบจะเรืองแสงสีแดงเตือน และ AI จะปฏิเสธการเดิน!")
+    print(" 4. 🔍 เมื่อกด [Enter] ระบบจะตรวจสอบสภาพสนามจริงว่าหมากครบสมบูรณ์ตรงกับความจำหรือไม่")
+    print(" 5. 👉 เมื่อผ่านกฎและสนามสมบูรณ์ AI ฝั่งดำจะเริ่มวิเคราะห์ Minimax และสั่ง Kinematics ไปยัง Webots Sim ทันที!")
     print(" 🔄 [f] กลับด้านกระดาน 180° | [u] Auto-Detect ทิศทางกระดาน | [o] หมุน 90°")
     print(" [1/r] รีเซ็ตเกมใหม่ | [z/x] ซูมกล้อง | [w/s/a/d] ขยับกรอบ | [q] ออก")
     print("=" * 68 + "\n")
@@ -909,46 +1106,117 @@ def main():
                     src_sq = rc_to_square_name(sr, sc)
                     dst_sq = rc_to_square_name(dr, dc)
                     human_move_str = f"{src_sq}{dst_sq}"
-
-                    # 1. บันทึกและเดินหมากขาวใน C Engine
-                    c_engine.engine_apply_human_move(human_move_str.encode('utf-8'))
                     moved_p = board_2d[sr][sc]
-                    print(f"\n👤 [HUMAN MOVE] White played: {moved_p} ({src_sq} -> {dst_sq})")
 
-                    # 2. อนิเมตหมากขาวบนกระดาน 2D
-                    animate_move(board_2d, (sr, sc), (dr, dc), win_2d, is_robot=False)
-                    board_2d[dr][dc] = moved_p
-                    board_2d[sr][sc] = None
+                    # ── 1. ตรวจสอบกติกาหมากรุกสากลด้วย C Engine (Move Legality Check) ──
+                    is_legal = c_engine.engine_is_legal_move(human_move_str.encode('utf-8'))
 
-                    # 3. บันทึกสถานะสภาพแวดล้อมกระดานล่าสุดลงในระบบความจำมินิ
-                    save_mini_memory_state(turn_count, board_2d, last_move=human_move_str, active_turn="Waiting Trigger -> Black (Robot)")
-                    print(f"💾 [MINI MEMORY] บันทึกสภาพแวดล้อมกระดานล่าสุดลง '{MINI_MEMORY_FILE}' เรียบร้อย")
+                    if not is_legal:
+                        # 🚨 กรณีเดินผิดกฎหมากรุก:
+                        # เรืองแสงสีแดงนีออนที่ช่องหมาก แจ้งเตือน และ AI จะไม่เดินเด็ดขาด
+                        illegal_move_info = {
+                            'src': (sr, sc),
+                            'dst': (dr, dc),
+                            'src_name': src_sq,
+                            'dst_name': dst_sq,
+                            'piece': moved_p,
+                            'expire_time': time.time() + 10.0
+                        }
+                        field_alert_squares.clear()
+                        game_state = 'WAITING_HUMAN'
+                        auto_trigger_ai_after_scan = False
+                        last_status_msg = f"🚨 [ILLEGAL MOVE] {moved_p} {src_sq}->{dst_sq} ผิดกฎหมากรุก! ยกหมากกลับช่อง {src_sq}"
 
-                    # 4. เข้าสู่สถานะ WAITING_AI_TRIGGER รอผู้เล่นกด [Enter] เพื่อสั่งให้ AI เริ่มวิเคราะห์และเดิน
-                    game_state = 'WAITING_AI_TRIGGER'
-                    last_status_msg = f"[WHITE CONFIRMED] {src_sq}->{dst_sq} | Press [ENTER] to tell AI to move!"
+                        print("\n" + "🚨" * 36)
+                        print(f" 🚨 [ILLEGAL MOVE DETECTED] การเดิน {moved_p} ({src_sq} -> {dst_sq}) ผิดกฎกติกาหมากรุกสากล!")
+                        print(f" 🚨 ระบบปฏิเสธการเดินนี้ และ AI ฝั่งดำจะไม่เดินเด็ดขาด!")
+                        print(f" 🚨 กรุณายกหมาก {moved_p} กลับไปที่ช่อง {src_sq} แล้วเดินตาใหม่ที่ถูกต้อง")
+                        print("🚨" * 36 + "\n")
+                    else:
+                        # ✅ กรณีเดินถูกต้องตามกฎ:
+                        illegal_move_info = None
+                        field_alert_squares.clear()
+                        print(f"\n👤 [HUMAN MOVE VALID] White played: {moved_p} ({src_sq} -> {dst_sq}) - ถูกต้องตามกฎ!")
 
-                    print("\n" + "=" * 68)
-                    print(f" ✅ [WHITE MOVE CONFIRMED] หมากขาวเดิน: {moved_p} ({src_sq} -> {dst_sq}) เรียบร้อย!")
-                    print(" 👉 จบตาผู้เล่นแล้ว! กดปุ่ม [ENTER] (หรือ Spacebar) เพื่อสั่ง AI วิเคราะห์และเริ่มเดินฝั่งดำ!")
-                    print("=" * 68 + "\n")
+                        # 2. อนิเมตหมากขาวบนกระดาน 2D
+                        animate_move(board_2d, (sr, sc), (dr, dc), win_2d, is_robot=False)
+                        board_2d[dr][dc] = moved_p
+                        board_2d[sr][sc] = None
+
+                        # 🏰 ตรวจจับการเข้าป้อมของหมากขาว (Castling): ขยับเรือ (Rook) ตามด้วย
+                        if moved_p == 'WK' and abs(sc - dc) == 2:
+                            if dc == 6:  # Kingside (O-O): e1 -> g1, เรือ h1 -> f1
+                                rook_src = (7, 7); rook_dst = (7, 5)
+                            else:        # Queenside (O-O-O): e1 -> c1, เรือ a1 -> d1
+                                rook_src = (7, 0); rook_dst = (7, 3)
+                            animate_move(board_2d, rook_src, rook_dst, win_2d, is_robot=False)
+                            board_2d[rook_dst[0]][rook_dst[1]] = board_2d[rook_src[0]][rook_src[1]]
+                            board_2d[rook_src[0]][rook_src[1]] = None
+                            print(f"🏰 [CASTLING] เข้าป้อมสำเร็จ! ย้ายเรือ {rook_src} -> {rook_dst} เรียบร้อย")
+
+                        # 3. บันทึกสถานะสภาพแวดล้อมกระดานล่าสุดลงในระบบความจำมินิ
+                        save_mini_memory_state(turn_count, board_2d, last_move=human_move_str, active_turn="Waiting Trigger -> Black (Robot)")
+                        print(f"💾 [MINI MEMORY] บันทึกสภาพแวดล้อมกระดานล่าสุดลง '{MINI_MEMORY_FILE}' เรียบร้อย")
+
+                        pending_human_move = human_move_str
+
+                        if auto_trigger_ai_after_scan:
+                            auto_trigger_ai_after_scan = False
+                            # ตรวจสอบสภาพสนามต่อทันที
+                            print("\n🔍 [FIELD CHECK] กำลังตรวจสอบสภาพสนามจริงผ่านกล้องสด...")
+                            field_ok, missing_list, _, field_msg = verify_field_environment(
+                                cap, M, dest_size, kernel_open, kernel_dilate, zoom_factor, board_2d
+                            )
+                            if not field_ok:
+                                field_alert_squares = [(r, c) for r, c, _ in missing_list]
+                                game_state = 'WAITING_AI_TRIGGER'
+                                last_status_msg = f"⚠️ [FIELD DESYNC] {field_msg[:42]}... | AI Refused to move!"
+                                print("\n" + "⚠️" * 36)
+                                print(f" ⚠️ [FIELD INTEGRITY FAILED] สภาพสนามไม่พร้อมสำหรับการเล่น!")
+                                print(f" ⚠️ รายละเอียด: {field_msg}")
+                                print(f" ⚠️ AI ฝั่งดำปฏิเสธการเดิน! กรุณาจัดหมากบนกระดานจริงให้ถูกต้องและกด [ENTER] เพื่อให้ AI เริ่มเดิน")
+                                print("⚠️" * 36 + "\n")
+                            else:
+                                field_alert_squares.clear()
+                                c_engine.engine_apply_human_move(pending_human_move.encode('utf-8'))
+                                pending_human_move = None
+                                game_state, turn_count, last_status_msg, last_robot_protocol, in_check_color = execute_robot_turn(
+                                    c_engine, board_2d, turn_count, win_2d
+                                )
+                        else:
+                            # เข้าสู่สถานะ WAITING_AI_TRIGGER รอผู้เล่นกด [Enter] เท่านั้นเพื่อสั่งให้ AI เริ่มวิเคราะห์และเดิน
+                            game_state = 'WAITING_AI_TRIGGER'
+                            last_status_msg = f"[WHITE CONFIRMED] {src_sq}->{dst_sq} | Press [ENTER ONLY] to verify field & trigger AI!"
+
+                            print("\n" + "=" * 68)
+                            print(f" ✅ [WHITE MOVE CONFIRMED] หมากขาวเดิน: {moved_p} ({src_sq} -> {dst_sq}) ถูกกฎเรียบร้อย!")
+                            print(" 👉 จบตาผู้เล่นแล้ว! กดปุ่ม [ENTER] เพื่อตรวจสอบสภาพสนามจริงและสั่ง AI เริ่มเดินฝั่งดำ!")
+                            print("=" * 68 + "\n")
                 else:
                     print("[INFO] ไม่พบการขยับหมากของฝั่งขาว กระดานคงเดิม")
-                    last_status_msg = "[WAITING] No move detected | Move White piece on board & press [Space]"
+                    last_status_msg = "[WAITING] No move detected | Move White piece on board & press [Space] or [Enter]"
                     game_state = 'WAITING_HUMAN'
+                    auto_trigger_ai_after_scan = False
 
         # Badge Text on Camera window
-        if game_state == 'SCANNING_HUMAN':
-            badge_txt = f"STATE: [SCANNING ({len(scan_passes)}/16)] Verifying White Move..."
+        now_b = time.time()
+        if illegal_move_info and now_b < illegal_move_info.get('expire_time', 0):
+            badge_txt = f"🚨 [ILLEGAL MOVE] Return {illegal_move_info['piece']} to {illegal_move_info['src_name']}!"
+            badge_col = (0, 0, 255)
+        elif field_alert_squares:
+            badge_txt = f"⚠️ [FIELD DESYNC] {len(field_alert_squares)} pieces missing from board!"
+            badge_col = (0, 140, 255)
+        elif game_state == 'SCANNING_HUMAN':
+            badge_txt = f"STATE: [SCANNING ({len(scan_passes)}/16)] Verifying White Move & Rules..."
             badge_col = (0, 215, 255)
         elif game_state == 'WAITING_AI_TRIGGER':
-            badge_txt = "STATE: [PRESS ENTER] Tell AI to analyze & move Black!"
+            badge_txt = "STATE: [PRESS ENTER ONLY] Verify field & trigger AI Black!"
             badge_col = (0, 215, 255)
         elif game_state == 'GAME_OVER':
             badge_txt = "STATE: [GAME OVER] Match Concluded"
             badge_col = (0, 0, 255)
         else:
-            badge_txt = "STATE: [WAITING HUMAN] Move White on board & press [Space]"
+            badge_txt = "STATE: [WAITING HUMAN] Move White on board & press [Space] or [Enter]"
             badge_col = (0, 255, 0)
 
         cv2.putText(cam_display, badge_txt, (30, 45), cv2.FONT_HERSHEY_SIMPLEX, 0.60, badge_col, 2)
@@ -960,7 +1228,10 @@ def main():
         # Render 2D Digital Twin
         board_render = render_board_2d(
             board_2d, status=last_status_msg,
-            robot_action=last_robot_protocol, in_check_color=in_check_color
+            robot_action=last_robot_protocol, in_check_color=in_check_color,
+            turn_state=game_state,
+            illegal_glow=illegal_move_info,
+            field_alert_squares=field_alert_squares
         )
         cv2.imshow(win_2d, board_render)
 
@@ -987,26 +1258,57 @@ def main():
             last_robot_protocol = ""
             in_check_color = None
             scan_passes.clear()
-            last_status_msg = "[RESET] New game started! White to move (Press [Space])"
+            illegal_move_info = None
+            field_alert_squares.clear()
+            pending_human_move = None
+            auto_trigger_ai_after_scan = False
+            last_status_msg = "[RESET] New game started! White to move (Press [Space] or [Enter])"
             print(f"\n🔄 [RESET] รีเซ็ตกระดานและ C Engine เริ่มเกมใหม่เรียบร้อย! ({ORIENTATIONS[orientation]})")
         elif key in (10, 13):
-            # [Enter] หรือ [Return] key: สั่งให้ AI คิดและเดิน
-            if game_state == 'WAITING_AI_TRIGGER':
-                game_state, turn_count, last_status_msg, last_robot_protocol, in_check_color = execute_robot_turn(
-                    c_engine, board_2d, turn_count, win_2d
+            # [Enter] หรือ [Return] key: ตรวจสอบกฎ สภาพสนาม และสั่งให้ AI เดินหมาก
+            now_t = time.time()
+            if illegal_move_info and now_t < illegal_move_info.get('expire_time', 0):
+                print("\n🚨 [BLOCKED] ไม่สามารถเริ่มตา AI ได้: ตาเดินของผู้เล่นยังผิดกฎหมากรุกอยู่!")
+                print(f"🚨 กรุณายกหมาก {illegal_move_info['piece']} กลับไปที่ช่อง {illegal_move_info['src_name']} ให้ถูกต้องก่อนครับ")
+                last_status_msg = f"🚨 [BLOCKED] Illegal move! Return {illegal_move_info['piece']} to {illegal_move_info['src_name']}"
+            elif game_state == 'WAITING_AI_TRIGGER':
+                # ── ตรวจสอบสภาพสนามจริงก่อนสั่ง AI (Field Integrity Check) ──
+                print("\n🔍 [FIELD CHECK] กำลังตรวจสอบสภาพสนามจริงผ่านกล้องสดก่อนสั่ง AI...")
+                field_ok, missing_list, _, field_msg = verify_field_environment(
+                    cap, M, dest_size, kernel_open, kernel_dilate, zoom_factor, board_2d
                 )
+                if not field_ok:
+                    field_alert_squares = [(r, c) for r, c, _ in missing_list]
+                    last_status_msg = f"⚠️ [FIELD DESYNC] {field_msg[:42]}... | AI Refused to move!"
+                    print("\n" + "⚠️" * 36)
+                    print(f" ⚠️ [FIELD INTEGRITY FAILED] สภาพสนามไม่พร้อมสำหรับการเล่น!")
+                    print(f" ⚠️ รายละเอียด: {field_msg}")
+                    print(f" ⚠️ AI ฝั่งดำปฏิเสธการเดิน! กรุณาจัดหมากบนกระดานจริงให้ถูกต้องและกด [ENTER] อีกครั้ง")
+                    print("⚠️" * 36 + "\n")
+                else:
+                    field_alert_squares.clear()
+                    print("✅ [FIELD OK] สภาพสนามสมบูรณ์ตรงกับหน่วยความจำ! สั่ง AI เริ่มเดิน...")
+                    if pending_human_move:
+                        c_engine.engine_apply_human_move(pending_human_move.encode('utf-8'))
+                        pending_human_move = None
+                    game_state, turn_count, last_status_msg, last_robot_protocol, in_check_color = execute_robot_turn(
+                        c_engine, board_2d, turn_count, win_2d
+                    )
             elif game_state == 'WAITING_HUMAN':
-                print("[INFO] ขณะนี้ตาของหมากขาว: กรุณาเดินหมากบนกระดานจริงแล้วกด [Spacebar] เพื่อสแกนครับ")
+                print("\n🔄 [ENTER] เริ่มสแกน ตรวจสอบกฎ และเช็คสภาพสนาม...")
+                game_state = 'SCANNING_HUMAN'
+                scan_passes.clear()
+                auto_trigger_ai_after_scan = True
         elif key == ord(' '):
             if game_state == 'WAITING_HUMAN':
                 print("\n🔄 [SPACE] เริ่มสแกนตรวจสอบการเดินของหมากขาว...")
                 game_state = 'SCANNING_HUMAN'
                 scan_passes.clear()
+                auto_trigger_ai_after_scan = False
             elif game_state == 'WAITING_AI_TRIGGER':
-                # อำนวยความสะดวก: สามารถกด Spacebar เพื่อส่งสัญญาณให้ AI เดินได้เช่นกัน
-                game_state, turn_count, last_status_msg, last_robot_protocol, in_check_color = execute_robot_turn(
-                    c_engine, board_2d, turn_count, win_2d
-                )
+                # บังคับกดเฉพาะปุ่ม [ENTER] เท่านั้น
+                print("\n⚠️ [ENTER ONLY] จบตาคุณแล้ว กรุณากดปุ่ม [ENTER] เท่านั้น เพื่อตรวจสภาพสนามและสั่ง AI เริ่มเดิน!")
+                last_status_msg = "[WAITING ENTER ONLY] Press [ENTER] to verify field & trigger AI!"
         elif key == ord('z'):
             old_z = zoom_factor
             zoom_factor = min(4.0, round(zoom_factor + 0.1, 1))
