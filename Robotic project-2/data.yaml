@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 12
+names: ['Black bishop', 'Black knight', 'Black pawn', 'Black queen', 'Black rook', 'Board', 'White Pawn', 'White bishop', 'White king', 'White knight', 'White queen', 'White rook']
+
+roboflow:
+  workspace: bookylnwza007-gmail-com
+  project: robotic-project-mrhtk
+  version: 2
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/bookylnwza007-gmail-com/robotic-project-mrhtk/dataset/2

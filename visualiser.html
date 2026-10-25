@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hybrid Digital Twin Chess — GM ลงเชิฟ | Visualiser</title>
+  <style>
+    /* ─── Base ──────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:        #0d1117;
+      --surface:   #161b22;
+      --border:    #30363d;
+      --accent:    #58a6ff;
+      --green:     #3fb950;
+      --red:       #f85149;
+      --yellow:    #e3b341;
+      --cyan:      #56d364;
+      --text:      #e6edf3;
+      --muted:     #8b949e;
+      --sq-light:  #f0d9b5;
+      --sq-dark:   #b58863;
+      --sq-sel:    #6fcef5;
+      --sq-move:   #cef56f;
+      --sq-check:  #f85149;
+      --sq-last-f: rgba(207,188,40,.50);
+      --sq-last-t: rgba(207,188,40,.75);
+      --robot-bg:  #0d2137;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ─── Header ─────────────────────────────────────────────── */
+    header {
+      width: 100%;
+      background: linear-gradient(135deg, #161b22 0%, #0d2137 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    header .logo { font-size: 2rem; }
+    header h1 { font-size: 1.15rem; font-weight: 700; }
+    header h1 span { color: var(--accent); }
+    header p { font-size: .75rem; color: var(--muted); margin-top: 2px; }
+
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 2px 10px; border-radius: 20px; font-size: .72rem; font-weight: 600;
+    }
+    .badge-green  { background: rgba(63,185,80,.15); color: var(--green); border: 1px solid var(--green); }
+    .badge-cyan   { background: rgba(86,211,100,.10); color: var(--cyan);  border: 1px solid var(--cyan); }
+    .badge-yellow { background: rgba(227,179,65,.15); color: var(--yellow);border: 1px solid var(--yellow); }
+
+    /* ─── Layout ─────────────────────────────────────────────── */
+    main {
+      display: grid;
+      grid-template-columns: 200px auto 320px;
+      gap: 18px;
+      padding: 18px 22px;
+      width: 100%;
+      max-width: 1280px;
+      align-items: start;
+    }
+
+    /* ─── Panel (generic card) ───────────────────────────────── */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+    }
+    .panel h3 {
+      font-size: .78rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+      margin-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+    }
+
+    /* ─── Left Panel — Game Info ─────────────────────────────── */
+    #left-panel { display: flex; flex-direction: column; gap: 12px; }
+
+    .turn-indicator {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-weight: 700; font-size: .9rem;
+      border: 2px solid transparent;
+      transition: all .3s;
+    }
+    .turn-white { background: rgba(240,217,181,.10); border-color: var(--sq-light); color: var(--sq-light); }
+    .turn-black { background: rgba(86,211,100,.08); border-color: var(--accent); color: var(--accent); }
+    .turn-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+    .turn-white .turn-dot { background: #f0d9b5; }
+    .turn-black .turn-dot { background: var(--accent); }
+
+    .captured-row { display: flex; flex-wrap: wrap; gap: 2px; min-height: 22px; font-size: 1.25rem; }
+
+    .score-bar {
+      height: 8px; border-radius: 4px; background: var(--border);
+      overflow: hidden; position: relative;
+    }
+    .score-fill {
+      height: 100%; border-radius: 4px;
+      background: linear-gradient(90deg, #f0d9b5, #b58863);
+      transition: width .5s ease;
+    }
+
+    .stat-row { display: flex; justify-content: space-between; font-size: .8rem; margin-top: 4px; }
+    .stat-val { color: var(--accent); font-weight: 700; }
+
+    /* ─── Board ──────────────────────────────────────────────── */
+    #board-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
+
+    #board-container {
+      position: relative;
+      user-select: none;
+    }
+
+    .rank-labels, .file-labels {
+      display: flex;
+      color: var(--muted);
+      font-size: .72rem;
+      font-weight: 600;
+    }
+    .rank-labels {
+      flex-direction: column;
+      justify-content: space-around;
+      padding: 4px 4px;
+      width: 22px;
+    }
+    .file-labels {
+      flex-direction: row;
+      justify-content: space-around;
+      padding: 4px 0;
+      width: calc(8 * 70px);
+      margin-left: 22px;
+    }
+    .file-labels span, .rank-labels span {
+      display: flex; align-items: center; justify-content: center;
+      width: 70px; height: 70px;
+    }
+    .rank-labels span { width: 22px; height: 70px; }
+
+    #board-row { display: flex; }
+
+    #board {
+      display: grid;
+      grid-template-columns: repeat(8, 70px);
+      grid-template-rows: repeat(8, 70px);
+      border: 3px solid var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0,0,0,.6);
+    }
+
+    .sq {
+      width: 70px; height: 70px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2.6rem;
+      cursor: pointer;
+      position: relative;
+      transition: filter .12s;
+    }
+    .sq:hover { filter: brightness(1.15); }
+    .sq.light { background: var(--sq-light); }
+    .sq.dark  { background: var(--sq-dark); }
+    .sq.selected    { background: var(--sq-sel) !important; box-shadow: inset 0 0 0 4px rgba(0,120,200,.7); }
+    .sq.legal-move  { background: var(--sq-move) !important; }
+    .sq.in-check    { background: var(--sq-check) !important; animation: pulse-red 1s infinite; }
+    .sq.last-from   { background: var(--sq-last-f) !important; }
+    .sq.last-to     { background: var(--sq-last-t) !important; }
+
+    .sq .legal-dot {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: rgba(0,0,0,.22);
+      position: absolute;
+      pointer-events: none;
+    }
+    .sq.legal-move.has-piece .legal-dot {
+      width: 100%; height: 100%; border-radius: 0;
+      background: transparent;
+      box-shadow: inset 0 0 0 4px rgba(0,0,0,.22);
+    }
+    .piece {
+      display: block; line-height: 1;
+      filter: drop-shadow(1px 2px 3px rgba(0,0,0,.55));
+      pointer-events: none;
+    }
+
+    @keyframes pulse-red {
+      0%,100% { background: var(--sq-check) !important; }
+      50%      { background: #ff7875 !important; }
+    }
+
+    /* Robot thinking animation */
+    .thinking-overlay {
+      display: none;
+      position: absolute; inset: 0;
+      background: rgba(13,33,55,.55);
+      align-items: center; justify-content: center;
+      flex-direction: column; gap: 10px;
+      border-radius: 2px;
+      z-index: 10;
+    }
+    .thinking-overlay.active { display: flex; }
+    .spinner {
+      width: 44px; height: 44px;
+      border: 4px solid rgba(86,162,255,.2);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .thinking-text { color: var(--accent); font-weight: 700; font-size: .9rem; }
+
+    /* ─── Right Panel ────────────────────────────────────────── */
+    #right-panel { display: flex; flex-direction: column; gap: 12px; }
+
+    /* Status Banner */
+    #status-banner {
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: .9rem;
+      text-align: center;
+      border: 2px solid transparent;
+      min-height: 44px;
+      display: flex; align-items: center; justify-content: center;
+      transition: all .3s;
+    }
+    .status-normal  { background: rgba(48,54,61,.4); border-color: var(--border); color: var(--muted); }
+    .status-check   { background: rgba(248,81,73,.15); border-color: var(--red); color: var(--red); animation: shake .3s; }
+    .status-win     { background: rgba(63,185,80,.15); border-color: var(--green); color: var(--green); }
+    .status-draw    { background: rgba(227,179,65,.15); border-color: var(--yellow); color: var(--yellow); }
+
+    @keyframes shake {
+      0%,100% { transform: translateX(0); }
+      25%      { transform: translateX(-6px); }
+      75%      { transform: translateX(6px); }
+    }
+
+    /* Robot Command Feed */
+    #robot-feed {
+      background: var(--robot-bg);
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      font-family: 'Consolas', 'Fira Code', monospace;
+      font-size: .72rem;
+      padding: 10px 12px;
+      max-height: 180px;
+      overflow-y: auto;
+      display: flex; flex-direction: column; gap: 3px;
+    }
+    .rf-line { padding: 2px 0; border-bottom: 1px solid rgba(48,54,61,.5); }
+    .rf-action  { color: var(--cyan); }
+    .rf-gripper { color: var(--yellow); }
+    .rf-castle  { color: #d2a8ff; }
+    .rf-raw     { color: var(--accent); opacity: .8; }
+    .rf-header  { color: var(--accent); font-weight: 700; border-bottom: 1px solid var(--accent) !important; margin-bottom: 2px; }
+    .rf-dim     { color: var(--muted); }
+
+    /* Move History */
+    #move-history {
+      max-height: 190px;
+      overflow-y: auto;
+      display: grid;
+      grid-template-columns: 28px 1fr 1fr;
+      gap: 2px 6px;
+      font-size: .78rem;
+    }
+    .mh-num  { color: var(--muted); text-align: right; padding: 2px 4px; }
+    .mh-move {
+      padding: 2px 6px; border-radius: 4px;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .mh-move:hover { background: rgba(88,166,255,.15); }
+    .mh-move.white-m { color: var(--text); }
+    .mh-move.black-m { color: var(--accent); }
+
+    /* Algorithm Status */
+    #algo-status { font-size: .78rem; display: flex; flex-direction: column; gap: 6px; }
+    .algo-row { display: flex; justify-content: space-between; align-items: center; }
+    .algo-bar-wrap { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; margin-top: 2px; }
+    .algo-bar-fill { height: 100%; border-radius: 2px; background: var(--accent); transition: width 1s; }
+
+    /* Controls */
+    #controls { display: flex; gap: 8px; flex-wrap: wrap; }
+    button {
+      flex: 1; padding: 8px 12px; border-radius: 7px; border: 1px solid var(--border);
+      background: rgba(88,166,255,.12); color: var(--text); cursor: pointer;
+      font-size: .8rem; font-weight: 600; transition: all .15s;
+    }
+    button:hover { background: rgba(88,166,255,.25); border-color: var(--accent); }
+    button.danger { background: rgba(248,81,73,.12); border-color: rgba(248,81,73,.5); }
+    button.danger:hover { background: rgba(248,81,73,.25); }
+
+    /* Depth selector */
+    #depth-sel { display: flex; gap: 5px; }
+    #depth-sel button { flex: none; padding: 5px 10px; font-size: .75rem; }
+    #depth-sel button.active { background: rgba(88,166,255,.35); border-color: var(--accent); }
+
+    /* Win modal */
+    #modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.7); z-index: 100;
+      align-items: center; justify-content: center;
+    }
+    #modal-overlay.active { display: flex; }
+    #modal-box {
+      background: var(--surface);
+      border: 2px solid var(--accent);
+      border-radius: 16px;
+      padding: 32px 40px;
+      text-align: center;
+      animation: pop-in .35s cubic-bezier(.2,1.5,.5,1);
+    }
+    @keyframes pop-in {
+      from { transform: scale(.5); opacity: 0; }
+      to   { transform: scale(1);  opacity: 1; }
+    }
+    #modal-emoji { font-size: 4rem; }
+    #modal-title { font-size: 1.6rem; font-weight: 800; margin: 12px 0 8px; }
+    #modal-sub   { color: var(--muted); font-size: .9rem; }
+    #modal-btn   { margin-top: 20px; width: 160px; padding: 10px; font-size: .9rem; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* ─── Promotion modal ────────────────────────────────────── */
+    #promo-modal {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.65); z-index: 200;
+      align-items: center; justify-content: center;
+    }
+    #promo-modal.active { display: flex; }
+    #promo-box {
+      background: var(--surface);
+      border: 2px solid var(--yellow);
+      border-radius: 14px;
+      padding: 24px 32px;
+      text-align: center;
+    }
+    #promo-box h2 { margin-bottom: 14px; font-size: 1rem; color: var(--yellow); }
+    #promo-choices { display: flex; gap: 12px; justify-content: center; }
+    .promo-btn { font-size: 2.8rem; background: none; border: 2px solid var(--border); padding: 8px 14px; cursor: pointer; border-radius: 10px; }
+    .promo-btn:hover { border-color: var(--yellow); background: rgba(227,179,65,.15); }
+  </style>
+</head>
+<body>
+
+<!-- ═══ Header ══════════════════════════════════════════════════════ -->
+<header>
+  <span class="logo">♛</span>
+  <div>
+    <h1>Hybrid <span>Digital Twin</span> Chess System — <span>robotic.c</span> Visualiser</h1>
+    <p>Team: <b>GM ลงเชิฟ</b> &nbsp;|&nbsp; Robotics Course 01306202 &nbsp;|&nbsp; 2026</p>
+  </div>
+  <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;">
+    <span class="badge badge-green">● Algorithm Live</span>
+    <span class="badge badge-cyan">Minimax α-β</span>
+    <span class="badge badge-yellow">Webots Ready</span>
+  </div>
+</header>
+
+<!-- ═══ Main Layout ═════════════════════════════════════════════════ -->
+<main>
+
+  <!-- LEFT PANEL -->
+  <div id="left-panel">
+    <div class="panel">
+      <h3>⚡ Turn</h3>
+      <div id="turn-indicator" class="turn-indicator turn-white">
+        <div class="turn-dot"></div>
+        <span id="turn-text">White (Human)</span>
+      </div>
+      <div style="margin-top:10px;font-size:.75rem;color:var(--muted);">Move #<span id="move-num">1</span></div>
+    </div>
+
+    <div class="panel">
+      <h3>♟ Captured</h3>
+      <div style="font-size:.7rem;color:var(--muted);margin-bottom:4px;">White took:</div>
+      <div class="captured-row" id="cap-white"></div>
+      <div style="font-size:.7rem;color:var(--muted);margin-top:8px;margin-bottom:4px;">Black took:</div>
+      <div class="captured-row" id="cap-black"></div>
+    </div>
+
+    <div class="panel">
+      <h3>⚖ Material</h3>
+      <div class="score-bar"><div class="score-fill" id="score-fill" style="width:50%"></div></div>
+      <div class="stat-row">
+        <span>White</span><span class="stat-val" id="score-w">+0</span>
+      </div>
+      <div class="stat-row">
+        <span>Black</span><span class="stat-val" id="score-b">+0</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>🤖 AI Depth</h3>
+      <div id="depth-sel">
+        <button onclick="setDepth(1)">1</button>
+        <button onclick="setDepth(2)">2</button>
+        <button class="active" onclick="setDepth(3)">3</button>
+        <button onclick="setDepth(4)">4</button>
+      </div>
+      <div style="margin-top:8px;font-size:.72rem;color:var(--muted);">
+        Depth: <span id="depth-display" style="color:var(--accent);font-weight:700;">3</span>&nbsp;plies
+      </div>
+    </div>
+  </div>
+
+  <!-- BOARD -->
+  <div id="board-wrapper">
+    <div class="file-labels">
+      <span>a</span><span>b</span><span>c</span><span>d</span>
+      <span>e</span><span>f</span><span>g</span><span>h</span>
+    </div>
+    <div id="board-row">
+      <div class="rank-labels" id="rank-labels">
+        <span>8</span><span>7</span><span>6</span><span>5</span>
+        <span>4</span><span>3</span><span>2</span><span>1</span>
+      </div>
+      <div id="board-container">
+        <div id="board"></div>
+        <div class="thinking-overlay" id="thinking-overlay">
+          <div class="spinner"></div>
+          <div class="thinking-text">Robot calculating…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div id="right-panel">
+    <div id="status-banner" class="status-normal">Waiting for White's move…</div>
+
+    <div class="panel">
+      <h3>🤖 Webots Robot Command Feed</h3>
+      <div id="robot-feed">
+        <div class="rf-line rf-dim">// Robot action log will appear here after each Black move…</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>📋 Move History</h3>
+      <div id="move-history"></div>
+    </div>
+
+    <div class="panel">
+      <h3>🧠 Algorithm Status (robotic.c)</h3>
+      <div id="algo-status">
+        <div class="algo-row"><span>Board Representation</span><span class="badge badge-green">8×8 Active</span></div>
+        <div class="algo-row" style="margin-top:4px;"><span>Legal Move Gen</span><span class="badge badge-green">OK</span></div>
+        <div class="algo-row" style="margin-top:4px;"><span>Check Detection</span><span class="badge badge-green">OK</span></div>
+        <div class="algo-row" style="margin-top:4px;"><span>Minimax α-β</span><span class="badge badge-cyan">Ready</span></div>
+        <div class="algo-row" style="margin-top:4px;"><span>Castling Logic</span><span class="badge badge-green">OK</span></div>
+        <div class="algo-row" style="margin-top:4px;"><span>Webots IK Output</span><span class="badge badge-yellow">Standby</span></div>
+        <div class="algo-bar-wrap" style="margin-top:8px;"><div class="algo-bar-fill" id="algo-bar" style="width:0%"></div></div>
+        <div style="font-size:.7rem;color:var(--muted);margin-top:3px;" id="algo-label">Nodes evaluated: 0</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>🎮 Controls</h3>
+      <div id="controls">
+        <button onclick="newGame()">↺ New Game</button>
+        <button onclick="undoMove()">⟵ Undo</button>
+        <button class="danger" onclick="flipBoard()">⇅ Flip</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- WIN MODAL -->
+<div id="modal-overlay">
+  <div id="modal-box">
+    <div id="modal-emoji">🏆</div>
+    <div id="modal-title">Checkmate!</div>
+    <div id="modal-sub">The game is over.</div>
+    <button id="modal-btn" onclick="newGame()">↺ Play Again</button>
+  </div>
+</div>
+
+<!-- PROMOTION MODAL -->
+<div id="promo-modal">
+  <div id="promo-box">
+    <h2>♟ Pawn Promotion — Choose Piece</h2>
+    <div id="promo-choices"></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════
+     CHESS ENGINE — Direct JS port of robotic.c algorithm
+     ════════════════════════════════════════════════════════════════ -->
+<script>
+"use strict";
+
+/* ─── Constants (mirrors robotic.c enums) ─────────────────────── */
+const EMPTY=0, PAWN=1, KNIGHT=2, BISHOP=3, ROOK=4, QUEEN=5, KING=6;
+const NO_COLOR=0, WHITE=1, BLACK=2;
+const INF=1000000;
+
+const PIECE_VALUES=[0,100,320,330,500,900,20000];
+
+const PAWN_TABLE=[
+  [ 0,  0,  0,  0,  0,  0,  0,  0],
+  [50, 50, 50, 50, 50, 50, 50, 50],
+  [10, 10, 20, 30, 30, 20, 10, 10],
+  [ 5,  5, 10, 25, 25, 10,  5,  5],
+  [ 0,  0,  0, 20, 20,  0,  0,  0],
+  [ 5, -5,-10,  0,  0,-10, -5,  5],
+  [ 5, 10, 10,-20,-20, 10, 10,  5],
+  [ 0,  0,  0,  0,  0,  0,  0,  0],
+];
+const KNIGHT_TABLE=[
+  [-50,-40,-30,-30,-30,-30,-40,-50],
+  [-40,-20,  0,  0,  0,  0,-20,-40],
+  [-30,  0, 10, 15, 15, 10,  0,-30],
+  [-30,  5, 15, 20, 20, 15,  5,-30],
+  [-30,  0, 15, 20, 20, 15,  0,-30],
+  [-30,  5, 10, 15, 15, 10,  5,-30],
+  [-40,-20,  0,  5,  5,  0,-20,-40],
+  [-50,-40,-30,-30,-30,-30,-40,-50],
+];
+
+/* Piece Unicode symbols (White=♙ uppercase side, Black=♟ filled) */
+const PIECE_GLYPHS = {
+  [WHITE]: {[PAWN]:'♙',[KNIGHT]:'♘',[BISHOP]:'♗',[ROOK]:'♖',[QUEEN]:'♕',[KING]:'♔'},
+  [BLACK]: {[PAWN]:'♟',[KNIGHT]:'♞',[BISHOP]:'♝',[ROOK]:'♜',[QUEEN]:'♛',[KING]:'♚'},
+};
+
+/* ─── Game State ──────────────────────────────────────────────── */
+// board[r][c] = {type, color}
+let board, currentTurn, castling, lastMove, moveCount;
+let capturedWhite, capturedBlack;
+let history = [];   // array of game state snapshots for undo
+let moveHistoryNotation = [];
+let aiDepth = 3;
+let nodesEvaluated = 0;
+let boardFlipped = false;
+
+function makeBoard() {
+  return Array.from({length:8},()=>Array.from({length:8},()=>({type:EMPTY,color:NO_COLOR})));
+}
+
+function initGame() {
+  board = makeBoard();
+  currentTurn = WHITE;
+  castling = {wK:true,wQ:true,bK:true,bQ:true};
+  lastMove = null;
+  moveCount = 1;
+  capturedWhite = [];
+  capturedBlack = [];
+  history = [];
+  moveHistoryNotation = [];
+  nodesEvaluated = 0;
+
+  const back = [ROOK,KNIGHT,BISHOP,QUEEN,KING,BISHOP,KNIGHT,ROOK];
+  for(let c=0;c<8;c++){
+    board[0][c]={type:back[c],color:BLACK};
+    board[1][c]={type:PAWN,color:BLACK};
+    board[6][c]={type:PAWN,color:WHITE};
+    board[7][c]={type:back[c],color:WHITE};
+  }
+}
+
+/* ─── Utility ─────────────────────────────────────────────────── */
+function sqStr(r,c){ return String.fromCharCode(97+c)+(8-r); }
+function cloneBoard(b){ return b.map(row=>row.map(p=>({...p}))); }
+function cloneCastling(c){ return {...c}; }
+function pieceAt(r,c){ return board[r][c]; }
+function inBounds(r,c){ return r>=0&&r<8&&c>=0&&c<8; }
+function opp(color){ return color===WHITE?BLACK:WHITE; }
+
+/* ─── Attack / Check Detection (mirrors robotic.c) ────────────── */
+function isAttacked(b, r, c, byColor) {
+  const step = byColor===WHITE?1:-1;
+  const pr=r+step;
+  for(const pc of[c-1,c+1]){
+    if(inBounds(pr,pc)&&b[pr][pc].type===PAWN&&b[pr][pc].color===byColor) return true;
+  }
+  for(const [dr,dc] of[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]){
+    const nr=r+dr,nc=c+dc;
+    if(inBounds(nr,nc)&&b[nr][nc].type===KNIGHT&&b[nr][nc].color===byColor) return true;
+  }
+  for(const [dr,dc] of[[-1,-1],[-1,1],[1,-1],[1,1]]){
+    let nr=r+dr,nc=c+dc;
+    while(inBounds(nr,nc)){
+      const p=b[nr][nc];
+      if(p.type!==EMPTY){ if(p.color===byColor&&(p.type===BISHOP||p.type===QUEEN)) return true; break; }
+      nr+=dr; nc+=dc;
+    }
+  }
+  for(const [dr,dc] of[[-1,0],[1,0],[0,-1],[0,1]]){
+    let nr=r+dr,nc=c+dc;
+    while(inBounds(nr,nc)){
+      const p=b[nr][nc];
+      if(p.type!==EMPTY){ if(p.color===byColor&&(p.type===ROOK||p.type===QUEEN)) return true; break; }
+      nr+=dr; nc+=dc;
+    }
+  }
+  for(const [dr,dc] of[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]]){
+    const nr=r+dr,nc=c+dc;
+    if(inBounds(nr,nc)&&b[nr][nc].type===KING&&b[nr][nc].color===byColor) return true;
+  }
+  return false;
+}
+
+function findKing(b,color){
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++)
+    if(b[r][c].type===KING&&b[r][c].color===color) return [r,c];
+  return [-1,-1];
+}
+
+function inCheck(b,color){
+  const [kr,kc]=findKing(b,color);
+  if(kr<0) return false;
+  return isAttacked(b,kr,kc,opp(color));
+}
+
+/* ─── Pseudo-legal Move Generation (mirrors robotic.c) ────────── */
+function generatePseudo(b, cas, color) {
+  const moves=[];
+  const op=opp(color);
+  const fwd=color===WHITE?-1:1;
+  const startPawn=color===WHITE?6:1;
+  const promoRank=color===WHITE?0:7;
+
+  function add(fr,fc,tr,tc,castle=false,promo=false,promoPiece=QUEEN){
+    moves.push({fr,fc,tr,tc,castle,promo,promoPiece,
+      moved:{...b[fr][fc]}, captured:{...b[tr][tc]}});
+  }
+
+  for(let r=0;r<8;r++){
+    for(let c=0;c<8;c++){
+      const p=b[r][c];
+      if(p.color!==color) continue;
+
+      if(p.type===PAWN){
+        const f1=r+fwd;
+        if(inBounds(f1,c)&&b[f1][c].type===EMPTY){
+          if(f1===promoRank){
+            for(const pp of[QUEEN,ROOK,BISHOP,KNIGHT]) add(r,c,f1,c,false,true,pp);
+          } else {
+            add(r,c,f1,c);
+            const f2=r+2*fwd;
+            if(r===startPawn&&b[f2][c].type===EMPTY) add(r,c,f2,c);
+          }
+        }
+        for(const dc of[-1,1]){
+          const nc=c+dc;
+          if(inBounds(f1,nc)&&b[f1][nc].type!==EMPTY&&b[f1][nc].color===op){
+            if(f1===promoRank){
+              for(const pp of[QUEEN,ROOK,BISHOP,KNIGHT]) add(r,c,f1,nc,false,true,pp);
+            } else add(r,c,f1,nc);
+          }
+        }
+      }
+
+      else if(p.type===KNIGHT){
+        for(const [dr,dc] of[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]){
+          const nr=r+dr,nc=c+dc;
+          if(inBounds(nr,nc)&&b[nr][nc].color!==color) add(r,c,nr,nc);
+        }
+      }
+
+      else if(p.type===BISHOP||p.type===ROOK||p.type===QUEEN){
+        const diags=[[-1,-1],[-1,1],[1,-1],[1,1]];
+        const orthos=[[-1,0],[1,0],[0,-1],[0,1]];
+        const dirs=p.type===BISHOP?diags:p.type===ROOK?orthos:[...diags,...orthos];
+        for(const [dr,dc] of dirs){
+          let nr=r+dr,nc=c+dc;
+          while(inBounds(nr,nc)){
+            if(b[nr][nc].type===EMPTY){ add(r,c,nr,nc); }
+            else { if(b[nr][nc].color===op) add(r,c,nr,nc); break; }
+            nr+=dr; nc+=dc;
+          }
+        }
+      }
+
+      else if(p.type===KING){
+        for(const [dr,dc] of[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]]){
+          const nr=r+dr,nc=c+dc;
+          if(inBounds(nr,nc)&&b[nr][nc].color!==color) add(r,c,nr,nc);
+        }
+        // Castling (เข้าป้อม)
+        const kr=color===WHITE?7:0;
+        if(r===kr&&c===4){
+          const ks=color===WHITE?cas.wK:cas.bK;
+          const qs=color===WHITE?cas.wQ:cas.bQ;
+          if(ks&&b[kr][5].type===EMPTY&&b[kr][6].type===EMPTY&&
+             !isAttacked(b,kr,4,op)&&!isAttacked(b,kr,5,op)&&!isAttacked(b,kr,6,op)){
+            add(r,c,kr,6,true);
+          }
+          if(qs&&b[kr][1].type===EMPTY&&b[kr][2].type===EMPTY&&b[kr][3].type===EMPTY&&
+             !isAttacked(b,kr,4,op)&&!isAttacked(b,kr,3,op)&&!isAttacked(b,kr,2,op)){
+            add(r,c,kr,2,true);
+          }
+        }
+      }
+    }
+  }
+  return moves;
+}
+
+/* Apply a move to a board clone, returns new board */
+function applyMove(b, cas, m){
+  const nb = cloneBoard(b);
+  const nc = cloneCastling(cas);
+
+  nb[m.tr][m.tc]={...m.moved};
+  nb[m.fr][m.fc]={type:EMPTY,color:NO_COLOR};
+
+  if(m.promo) nb[m.tr][m.tc]={type:m.promoPiece,color:m.moved.color};
+
+  if(m.castle){
+    const r=m.fr;
+    if(m.tc===6){ nb[r][5]={...nb[r][7]}; nb[r][7]={type:EMPTY,color:NO_COLOR}; }
+    else        { nb[r][3]={...nb[r][0]}; nb[r][0]={type:EMPTY,color:NO_COLOR}; }
+  }
+  if(m.moved.type===KING){
+    if(m.moved.color===WHITE){nc.wK=false;nc.wQ=false;}
+    else{nc.bK=false;nc.bQ=false;}
+  }
+  if(m.moved.type===ROOK){
+    if(m.fr===7&&m.fc===7) nc.wK=false;
+    if(m.fr===7&&m.fc===0) nc.wQ=false;
+    if(m.fr===0&&m.fc===7) nc.bK=false;
+    if(m.fr===0&&m.fc===0) nc.bQ=false;
+  }
+  return {nb,nc};
+}
+
+function getLegalMoves(b, cas, color){
+  return generatePseudo(b,cas,color).filter(m=>{
+    const {nb}=applyMove(b,cas,m);
+    return !inCheck(nb,color);
+  });
+}
+
+/* ─── Evaluation (mirrors robotic.c evaluate_board) ──────────── */
+function evaluateBoard(b){
+  let ws=0, bs=0;
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+    const p=b[r][c];
+    if(p.type===EMPTY) continue;
+    let v=PIECE_VALUES[p.type];
+    let pst=0;
+    if(p.type===PAWN)   pst=p.color===WHITE?PAWN_TABLE[r][c]:PAWN_TABLE[7-r][c];
+    if(p.type===KNIGHT) pst=p.color===WHITE?KNIGHT_TABLE[r][c]:KNIGHT_TABLE[7-r][c];
+    if(p.color===WHITE) ws+=v+pst; else bs+=v+pst;
+  }
+  return ws-bs;
+}
+
+/* ─── Minimax + Alpha-Beta (mirrors robotic.c minimax) ────────── */
+function minimax(b, cas, depth, alpha, beta, isMax){
+  nodesEvaluated++;
+  const color=isMax?WHITE:BLACK;
+  const moves=getLegalMoves(b,cas,color);
+
+  if(moves.length===0){
+    if(inCheck(b,color)) return isMax?(-INF+(10-depth)):(INF-(10-depth));
+    return 0; // stalemate
+  }
+  if(depth===0) return evaluateBoard(b);
+
+  if(isMax){
+    let best=-INF;
+    for(const m of moves){
+      const {nb,nc}=applyMove(b,cas,m);
+      const v=minimax(nb,nc,depth-1,alpha,beta,false);
+      if(v>best) best=v;
+      if(v>alpha) alpha=v;
+      if(beta<=alpha) break;
+    }
+    return best;
+  } else {
+    let best=INF;
+    for(const m of moves){
+      const {nb,nc}=applyMove(b,cas,m);
+      const v=minimax(nb,nc,depth-1,alpha,beta,true);
+      if(v<best) best=v;
+      if(v<beta) beta=v;
+      if(beta<=alpha) break;
+    }
+    return best;
+  }
+}
+
+function getBestMove(b, cas, color){
+  nodesEvaluated=0;
+  const moves=getLegalMoves(b,cas,color);
+  let best=null, bestVal=(color===BLACK?INF:-INF);
+  for(const m of moves){
+    const {nb,nc}=applyMove(b,cas,m);
+    const v=minimax(nb,nc,aiDepth-1,-INF,INF,color!==BLACK);
+    if(color===BLACK?v<bestVal:v>bestVal){
+      bestVal=v;
+      best=m;
+    }
+  }
+  return best;
+}
+
+/* ─── Insufficient Material ───────────────────────────────────── */
+function insufficientMaterial(b){
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++)
+    if(b[r][c].type!==EMPTY&&b[r][c].type!==KING) return false;
+  return true;
+}
+
+/* ─── Notation ────────────────────────────────────────────────── */
+function toNotation(m){
+  const p=m.moved;
+  const sym=p.type===PAWN?'':['','','N','B','R','Q','K'][p.type];
+  const cap=m.captured.type!==EMPTY?'x':'';
+  const promo=m.promo?'='+['','','N','B','R','Q'][m.promoPiece]:'';
+  const castle=m.castle?(m.tc===6?'O-O':'O-O-O'):null;
+  return castle||`${sym}${sqStr(m.fr,m.fc)}${cap}${sqStr(m.tr,m.tc)}${promo}`;
+}
+
+/* ─── Robot Command Feed ──────────────────────────────────────── */
+function buildRobotCommands(m){
+  const from=sqStr(m.fr,m.fc), to=sqStr(m.tr,m.tc);
+  const lines=[];
+  lines.push({cls:'rf-header',text:`════ [ ROBOT CMD → WEBOTS ] ════ Move ${moveCount}`});
+  if(m.castle){
+    const side=m.tc===6?'Kingside':'Queenside';
+    lines.push({cls:'rf-castle',text:`[ACTION 1] KINEMATICS: MOVE KING   ${from} → ${to} (${side} Castle)`});
+    const rookFrom=m.tc===6?'h8':'a8';
+    const rookTo  =m.tc===6?'f8':'d8';
+    lines.push({cls:'rf-castle',text:`[ACTION 2] KINEMATICS: MOVE ROOK   ${rookFrom} → ${rookTo}`});
+  } else {
+    let i=1;
+    if(m.captured.type!==EMPTY){
+      lines.push({cls:'rf-gripper',text:`[ACTION ${i++}] GRIPPER: PICK PIECE AT ${to} → GRAVEYARD_BIN`});
+    }
+    lines.push({cls:'rf-gripper',text:`[ACTION ${i++}] GRIPPER: PICK BLACK PIECE AT ${from} → PLACE AT ${to}`});
+    if(m.promo){
+      lines.push({cls:'rf-action',text:`[ACTION ${i}] SWAP: REPLACE PAWN → ${['','','KNIGHT','BISHOP','ROOK','QUEEN'][m.promoPiece]}`});
+    }
+  }
+  lines.push({cls:'rf-raw',text:`>> RAW PROTOCOL: MOVE ${from} ${to}`});
+  lines.push({cls:'rf-dim',text:`>> Nodes evaluated: ${nodesEvaluated.toLocaleString()}`});
+  return lines;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   UI — Rendering & Interaction
+   ═══════════════════════════════════════════════════════════════ */
+let selected=null, legalForSelected=[];
+let pendingPromoMove=null;
+
+function renderBoard(){
+  const el=document.getElementById('board');
+  el.innerHTML='';
+
+  // Find check positions
+  const wInCheck=inCheck(board,WHITE);
+  const bInCheck=inCheck(board,BLACK);
+  const [wkr,wkc]=wInCheck?findKing(board,WHITE):[-1,-1];
+  const [bkr,bkc]=bInCheck?findKing(board,BLACK):[-1,-1];
+
+  const legalSet=new Set(legalForSelected.map(m=>`${m.tr},${m.tc}`));
+
+  for(let r=0;r<8;r++){
+    for(let c=0;c<8;c++){
+      const dr=boardFlipped?7-r:r, dc=boardFlipped?7-c:c;
+      const p=board[dr][dc];
+      const sq=document.createElement('div');
+
+      const isLight=(dr+dc)%2===0;
+      sq.className='sq '+(isLight?'light':'dark');
+
+      const isSel=selected&&selected[0]===dr&&selected[1]===dc;
+      const isLeg=legalSet.has(`${dr},${dc}`);
+      const isLastFrom=lastMove&&lastMove.fr===dr&&lastMove.fc===dc;
+      const isLastTo  =lastMove&&lastMove.tr===dr&&lastMove.tc===dc;
+      const isCheckSq=(dr===wkr&&dc===wkc)||(dr===bkr&&dc===bkc);
+
+      if(isSel)       sq.classList.add('selected');
+      else if(isCheckSq) sq.classList.add('in-check');
+      else if(isLeg)  sq.classList.add('legal-move');
+      else if(isLastTo)   sq.classList.add('last-to');
+      else if(isLastFrom) sq.classList.add('last-from');
+
+      if(isLeg) {
+        const dot=document.createElement('div');
+        dot.className='legal-dot';
+        sq.appendChild(dot);
+        if(p.type!==EMPTY) sq.classList.add('has-piece');
+      }
+
+      if(p.type!==EMPTY){
+        const span=document.createElement('span');
+        span.className='piece';
+        span.style.color=p.color===WHITE?'#fffff0':'#1a1a2e';
+        span.textContent=PIECE_GLYPHS[p.color][p.type]||'?';
+        sq.appendChild(span);
+      }
+
+      sq.dataset.r=dr; sq.dataset.c=dc;
+      sq.addEventListener('click',handleSquareClick);
+      el.appendChild(sq);
+    }
+  }
+
+  // Update turn indicator
+  const ti=document.getElementById('turn-indicator');
+  const tt=document.getElementById('turn-text');
+  const mn=document.getElementById('move-num');
+  ti.className='turn-indicator '+(currentTurn===WHITE?'turn-white':'turn-black');
+  tt.textContent=currentTurn===WHITE?'White (Human)':'Black (Robot)';
+  mn.textContent=moveCount;
+
+  // Material score
+  let ws=0,bs=0;
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++){
+    const p=board[r][c];
+    if(p.type===EMPTY) continue;
+    if(p.color===WHITE) ws+=PIECE_VALUES[p.type];
+    else bs+=PIECE_VALUES[p.type];
+  }
+  const wAdv=Math.max(0,ws-bs), bAdv=Math.max(0,bs-ws);
+  document.getElementById('score-w').textContent=(wAdv>0?'+':'')+wAdv;
+  document.getElementById('score-b').textContent=(bAdv>0?'+':'')+bAdv;
+  const pct=Math.round(ws/(ws+bs)*100)||50;
+  document.getElementById('score-fill').style.width=pct+'%';
+
+  // Captured
+  document.getElementById('cap-white').textContent=capturedWhite.map(p=>PIECE_GLYPHS[BLACK][p.type]).join('');
+  document.getElementById('cap-black').textContent=capturedBlack.map(p=>PIECE_GLYPHS[WHITE][p.type]).join('');
+
+  // Algo bar
+  const barPct=Math.min(100,Math.round(nodesEvaluated/1000));
+  document.getElementById('algo-bar').style.width=barPct+'%';
+  document.getElementById('algo-label').textContent=`Nodes evaluated: ${nodesEvaluated.toLocaleString()}`;
+}
+
+function renderMoveHistory(){
+  const el=document.getElementById('move-history');
+  el.innerHTML='';
+  for(let i=0;i<moveHistoryNotation.length;i+=2){
+    const num=document.createElement('div'); num.className='mh-num'; num.textContent=(i/2+1)+'.';
+    const wm=document.createElement('div'); wm.className='mh-move white-m'; wm.textContent=moveHistoryNotation[i]||'';
+    const bm=document.createElement('div'); bm.className='mh-move black-m'; bm.textContent=moveHistoryNotation[i+1]||'';
+    el.appendChild(num); el.appendChild(wm); el.appendChild(bm);
+  }
+  el.scrollTop=el.scrollHeight;
+}
+
+function addRobotFeedLine(lines){
+  const feed=document.getElementById('robot-feed');
+  feed.innerHTML='';
+  for(const l of lines){
+    const d=document.createElement('div');
+    d.className='rf-line '+l.cls;
+    d.textContent=l.text;
+    feed.appendChild(d);
+  }
+  feed.scrollTop=0;
+}
+
+function setStatus(msg, cls='status-normal'){
+  const el=document.getElementById('status-banner');
+  el.className=cls;
+  el.textContent=msg;
+  // Re-trigger animation
+  el.style.animation='none';
+  el.offsetHeight; // reflow
+  el.style.animation='';
+}
+
+/* ─── Square Click Handler ────────────────────────────────────── */
+function handleSquareClick(e){
+  if(currentTurn!==WHITE) return;
+
+  const r=parseInt(e.currentTarget.dataset.r);
+  const c=parseInt(e.currentTarget.dataset.c);
+  const p=board[r][c];
+
+  if(selected){
+    const [sr,sc]=selected;
+    const move=legalForSelected.find(m=>m.tr===r&&m.tc===c);
+    if(move){
+      // Check if promotion with multiple choices
+      if(move.promo&&board[sr][sc].type===PAWN){
+        // Gather all promo options for this target square
+        const promos=legalForSelected.filter(m=>m.tr===r&&m.tc===c&&m.promo);
+        if(promos.length>1){
+          pendingPromoMove={promos,color:WHITE};
+          showPromoModal(WHITE,promos);
+          return;
+        }
+      }
+      executeHumanMove(move);
+      return;
+    }
+    // Deselect or select new piece
+    if(p.color===WHITE){
+      selectSquare(r,c);
+    } else {
+      selected=null; legalForSelected=[];
+      renderBoard();
+    }
+  } else {
+    if(p.color===WHITE) selectSquare(r,c);
+  }
+}
+
+function selectSquare(r,c){
+  selected=[r,c];
+  legalForSelected=getLegalMoves(board,castling,WHITE).filter(m=>m.fr===r&&m.fc===c);
+  renderBoard();
+}
+
+/* ─── Show Promotion Modal ────────────────────────────────────── */
+function showPromoModal(color, promos){
+  const modal=document.getElementById('promo-modal');
+  const choices=document.getElementById('promo-choices');
+  choices.innerHTML='';
+  for(const m of promos){
+    const btn=document.createElement('button');
+    btn.className='promo-btn';
+    btn.textContent=PIECE_GLYPHS[color][m.promoPiece];
+    btn.title=['','Pawn','Knight','Bishop','Rook','Queen','King'][m.promoPiece];
+    btn.onclick=()=>{
+      modal.classList.remove('active');
+      if(color===WHITE) executeHumanMove(m);
+      else executeRobotMoveImmediate(m);
+    };
+    choices.appendChild(btn);
+  }
+  modal.classList.add('active');
+}
+
+/* ─── Execute Human Move ──────────────────────────────────────── */
+function executeHumanMove(m){
+  selected=null; legalForSelected=[];
+
+  // Snapshot for undo
+  history.push({board:cloneBoard(board),castling:cloneCastling(castling),
+    lastMove,moveCount,currentTurn,
+    capturedWhite:[...capturedWhite],capturedBlack:[...capturedBlack],
+    moveHistoryNotation:[...moveHistoryNotation]});
+
+  const notation=toNotation(m);
+  const {nb,nc}=applyMove(board,castling,m);
+  board=nb; castling=nc; lastMove=m;
+
+  if(m.captured.type!==EMPTY) capturedWhite.push(m.captured);
+  moveHistoryNotation.push(notation);
+  moveCount++;
+  currentTurn=BLACK;
+
+  renderBoard();
+  renderMoveHistory();
+  checkGameStatus();
+}
+
+/* ─── Robot AI Turn ───────────────────────────────────────────── */
+function triggerRobotMove(){
+  if(currentTurn!==BLACK) return;
+  const legal=getLegalMoves(board,castling,BLACK);
+  if(legal.length===0) return;
+
+  document.getElementById('thinking-overlay').classList.add('active');
+  setStatus('🤖 Robot (Black) is thinking…','status-normal');
+
+  setTimeout(()=>{
+    const best=getBestMove(board,castling,BLACK);
+    document.getElementById('thinking-overlay').classList.remove('active');
+    if(!best){ checkGameStatus(); return; }
+
+    // Snapshot for undo
+    history.push({board:cloneBoard(board),castling:cloneCastling(castling),
+      lastMove,moveCount,currentTurn,
+      capturedWhite:[...capturedWhite],capturedBlack:[...capturedBlack],
+      moveHistoryNotation:[...moveHistoryNotation]});
+
+    const notation=toNotation(best);
+    const commands=buildRobotCommands(best);
+    const {nb,nc}=applyMove(board,castling,best);
+    board=nb; castling=nc; lastMove=best;
+
+    if(best.captured.type!==EMPTY) capturedBlack.push(best.captured);
+    moveHistoryNotation.push(notation);
+    moveCount++;
+    currentTurn=WHITE;
+
+    addRobotFeedLine(commands);
+    renderBoard();
+    renderMoveHistory();
+    checkGameStatus();
+  }, 80); // small delay for smooth UX
+}
+
+function executeRobotMoveImmediate(m){
+  document.getElementById('thinking-overlay').classList.remove('active');
+  const notation=toNotation(m);
+  const commands=buildRobotCommands(m);
+  const {nb,nc}=applyMove(board,castling,m);
+  board=nb; castling=nc; lastMove=m;
+  if(m.captured.type!==EMPTY) capturedBlack.push(m.captured);
+  moveHistoryNotation.push(notation);
+  moveCount++;
+  currentTurn=WHITE;
+  addRobotFeedLine(commands);
+  renderBoard();
+  renderMoveHistory();
+  checkGameStatus();
+}
+
+/* ─── Game Status Check ───────────────────────────────────────── */
+function checkGameStatus(){
+  const legal=getLegalMoves(board,castling,currentTurn);
+  const wCheck=inCheck(board,WHITE), bCheck=inCheck(board,BLACK);
+
+  if(legal.length===0){
+    if(inCheck(board,currentTurn)){
+      const winner=currentTurn===WHITE?'Black (Robot)':'White (Human)';
+      const emoji=currentTurn===WHITE?'🤖':'🏆';
+      setStatus(`♚ CHECKMATE! ${winner} wins!`,'status-win');
+      showModal(emoji,`CHECKMATE!`,`${winner} wins the game!`);
+    } else {
+      setStatus('🤝 STALEMATE — The game is a draw!','status-draw');
+      showModal('🤝','STALEMATE','The game is a draw.');
+    }
+    return;
+  }
+
+  if(insufficientMaterial(board)){
+    setStatus('🤝 DRAW — Insufficient material (Only Kings remain)','status-draw');
+    showModal('🤝','DRAW','Insufficient material — Only Kings remain.');
+    return;
+  }
+
+  if(wCheck){
+    setStatus('⚠️ WHITE KING IS IN CHECK! Move to escape.','status-check');
+  } else if(bCheck){
+    setStatus('⚠️ BLACK KING IS IN CHECK! Robot must escape.','status-check');
+    setTimeout(()=>triggerRobotMove(),400);
+  } else if(currentTurn===WHITE){
+    setStatus('👤 Your turn — Click a piece to move.','status-normal');
+  } else {
+    setTimeout(()=>triggerRobotMove(),400);
+  }
+}
+
+/* ─── Controls ────────────────────────────────────────────────── */
+function newGame(){
+  document.getElementById('modal-overlay').classList.remove('active');
+  document.getElementById('promo-modal').classList.remove('active');
+  document.getElementById('thinking-overlay').classList.remove('active');
+  initGame();
+  selected=null; legalForSelected=[];
+  document.getElementById('robot-feed').innerHTML=
+    '<div class="rf-line rf-dim">// Robot action log will appear here after each Black move…</div>';
+  renderBoard();
+  renderMoveHistory();
+  setStatus('👤 Your turn — Click a piece to move.','status-normal');
+}
+
+function undoMove(){
+  if(history.length===0) return;
+  const snap=history.pop();
+  board=snap.board; castling=snap.castling; lastMove=snap.lastMove;
+  moveCount=snap.moveCount; currentTurn=snap.currentTurn;
+  capturedWhite=snap.capturedWhite; capturedBlack=snap.capturedBlack;
+  moveHistoryNotation=snap.moveHistoryNotation;
+  selected=null; legalForSelected=[];
+  document.getElementById('robot-feed').innerHTML=
+    '<div class="rf-line rf-dim">// Undo performed.</div>';
+  renderBoard();
+  renderMoveHistory();
+  setStatus('↩ Move undone. Your turn.','status-normal');
+}
+
+function flipBoard(){
+  boardFlipped=!boardFlipped;
+  renderBoard();
+}
+
+function setDepth(d){
+  aiDepth=d;
+  document.getElementById('depth-display').textContent=d;
+  document.querySelectorAll('#depth-sel button').forEach((b,i)=>{
+    b.classList.toggle('active',i===d-1);
+  });
+}
+
+function showModal(emoji,title,sub){
+  document.getElementById('modal-emoji').textContent=emoji;
+  document.getElementById('modal-title').textContent=title;
+  document.getElementById('modal-sub').textContent=sub;
+  document.getElementById('modal-overlay').classList.add('active');
+}
+
+/* ─── Boot ─────────────────────────────────────────────────────── */
+initGame();
+renderBoard();
+renderMoveHistory();
+setStatus('👤 Your turn — Click a piece to move.','status-normal');
+</script>
+</body>
+</html>
