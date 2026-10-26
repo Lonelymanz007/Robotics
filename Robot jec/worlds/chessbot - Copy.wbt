@@ -1,0 +1,1429 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/RectangleArena.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/appearances/protos/Parquetry.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/robots/universal_robots/protos/UR10e.proto"
+
+WorldInfo {
+}
+Viewpoint {
+  orientation 0.23030758521390798 -0.5964365726142743 -0.7689095077062554 5.352375618163751
+  position -3.991497135430966 -2.6859426384410963 2.6697304013997716
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
+RectangleArena {
+  translation -0.16 0 0
+  floorSize 20 20
+  floorAppearance Parquetry {
+  }
+}
+Solid {
+  translation -0.76 0.73 -0.05
+  children [
+    Transform {
+      translation -0.55 -0.42 -0.075
+      scale 0.005 0.005 0.005
+      children [
+        Shape {
+          appearance PBRAppearance {
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/pawn.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "white_pawn"
+  boundingObject Pose {
+    translation -0.515 -0.38 0.13
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.13
+          radius 0.044
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation -0.61 0.73 -0.05
+  children [
+    Transform {
+      translation -0.55 -0.42 -0.075
+      scale 0.005 0.005 0.005
+      children [
+        Shape {
+          appearance PBRAppearance {
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/pawn.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "white_pawn(1)"
+  boundingObject Pose {
+    translation -0.515 -0.38 0.13
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.13
+          radius 0.044
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation -0.48 0.73 -0.05
+  children [
+    Transform {
+      translation -0.55 -0.42 -0.075
+      scale 0.005 0.005 0.005
+      children [
+        Shape {
+          appearance PBRAppearance {
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/pawn.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "white_pawn(2)"
+  boundingObject Pose {
+    translation -0.515 -0.38 0.13
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.13
+          radius 0.044
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation -0.34 0.73 -0.05
+  children [
+    Transform {
+      translation -0.55 -0.42 -0.075
+      scale 0.005 0.005 0.005
+      children [
+        Shape {
+          appearance PBRAppearance {
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/pawn.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "white_pawn(3)"
+  boundingObject Pose {
+    translation -0.515 -0.38 0.13
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.13
+          radius 0.044
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation -0.19 0.73 -0.05
+  children [
+    Transform {
+      translation -0.55 -0.42 -0.075
+      scale 0.005 0.005 0.005
+      children [
+        Shape {
+          appearance PBRAppearance {
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/pawn.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "white_pawn(4)"
+  boundingObject Pose {
+    translation -0.515 -0.38 0.13
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.13
+          radius 0.044
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation -0.05 0.73 -0.05
+  children [
+    Transform {
+      translation -0.55 -0.42 -0.075
+      scale 0.005 0.005 0.005
+      children [
+        Shape {
+          appearance PBRAppearance {
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/pawn.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "white_pawn(5)"
+  boundingObject Pose {
+    translation -0.515 -0.38 0.13
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.13
+          radius 0.044
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation 0.08 0.73 -0.05
+  children [
+    Transform {
+      translation -0.55 -0.42 -0.075
+      scale 0.005 0.005 0.005
+      children [
+        Shape {
+          appearance PBRAppearance {
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/pawn.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "white_pawn(6)"
+  boundingObject Pose {
+    translation -0.515 -0.38 0.13
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.13
+          radius 0.044
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation 0.23 0.73 -0.05
+  children [
+    Transform {
+      translation -0.55 -0.42 -0.075
+      scale 0.005 0.005 0.005
+      children [
+        Shape {
+          appearance PBRAppearance {
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/pawn.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "white_pawn(7)"
+  boundingObject Pose {
+    translation -0.515 -0.38 0.13
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.13
+          radius 0.044
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation 0.22 0.04 -0.05
+  children [
+    Transform {
+      translation -0.55 -0.42 -0.075
+      scale 0.005 0.005 0.005
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.607843 0.403922 0.301961
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/pawn.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "b_pawn"
+  boundingObject Pose {
+    translation -0.515 -0.38 0.13
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.13
+          radius 0.044
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation 0.08 0.03 -0.05
+  children [
+    Transform {
+      translation -0.55 -0.42 -0.075
+      scale 0.005 0.005 0.005
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.607843 0.403922 0.301961
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/pawn.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "b_pawn(1)"
+  boundingObject Pose {
+    translation -0.515 -0.38 0.13
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.13
+          radius 0.044
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation -0.05 0.03 -0.05
+  children [
+    Transform {
+      translation -0.55 -0.42 -0.075
+      scale 0.005 0.005 0.005
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.607843 0.403922 0.301961
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/pawn.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "b_pawn(2)"
+  boundingObject Pose {
+    translation -0.515 -0.38 0.13
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.13
+          radius 0.044
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation -0.2 0.03 -0.05
+  children [
+    Transform {
+      translation -0.55 -0.42 -0.075
+      scale 0.005 0.005 0.005
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.607843 0.403922 0.301961
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/pawn.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "b_pawn(3)"
+  boundingObject Pose {
+    translation -0.515 -0.38 0.13
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.13
+          radius 0.044
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation -0.34 0.32 -0.05
+  children [
+    Transform {
+      translation -0.55 -0.42 -0.075
+      scale 0.005 0.005 0.005
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.607843 0.403922 0.301961
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/pawn.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "b_pawn(4)"
+  boundingObject Pose {
+    translation -0.515 -0.38 0.14
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.13
+          radius 0.044
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation -0.48 0.03 -0.05
+  children [
+    Transform {
+      translation -0.55 -0.42 -0.075
+      scale 0.005 0.005 0.005
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.607843 0.403922 0.301961
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/pawn.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "b_pawn(5)"
+  boundingObject Pose {
+    translation -0.515 -0.38 0.13
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.13
+          radius 0.044
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation -0.61 0.03 -0.05
+  children [
+    Transform {
+      translation -0.55 -0.42 -0.075
+      scale 0.005 0.005 0.005
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.607843 0.403922 0.301961
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/pawn.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "b_pawn(6)"
+  boundingObject Pose {
+    translation -0.515 -0.38 0.13
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.13
+          radius 0.044
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation -0.76 0.03 -0.05
+  children [
+    Transform {
+      translation -0.55 -0.42 -0.075
+      scale 0.005 0.005 0.005
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.607843 0.403922 0.301961
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/pawn.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "b_pawn(7)"
+  boundingObject Pose {
+    translation -0.515 -0.38 0.13
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.13
+          radius 0.044
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation -1.10671 0.460701 -0.15
+  rotation 0 0 1 0.0915918
+  children [
+    Transform {
+      translation 0 0.01 0.05
+      scale 0.004 0.004 0.004
+      children [
+        Shape {
+          appearance PBRAppearance {
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/knight.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "w_knight"
+  boundingObject Pose {
+    translation -0.018 0.03 0.24
+    rotation 0 1 0 0
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.15
+          radius 0.03
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation -0.414262 0.464088 -0.15
+  rotation 0 0 -1 -0.09159530717958653
+  children [
+    Transform {
+      translation 0 0.01 0.05
+      scale 0.004 0.004 0.004
+      children [
+        Shape {
+          appearance PBRAppearance {
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/knight.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "w_knight(1)"
+  boundingObject Pose {
+    translation -0.018 0.03 0.24
+    rotation 0 1 0 0
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.15
+          radius 0.03
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation -1.15107 -0.461793 -0.14
+  rotation 0 0 1 3.14159
+  children [
+    Transform {
+      translation 0 0.01 0.05
+      scale 0.004 0.004 0.004
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.607843 0.403922 0.301961
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/knight.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "b_knight(1)"
+  boundingObject Pose {
+    translation -0.018 0.03 0.24
+    rotation 0 1 0 0
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.15
+          radius 0.03
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation -0.44107 -0.461793 -0.15
+  rotation 0 0 1 -3.1415853071795863
+  children [
+    Transform {
+      translation 0 0.01 0.05
+      scale 0.004 0.004 0.004
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.607843 0.403922 0.301961
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/knight.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "b_knight(2)"
+  boundingObject Pose {
+    translation -0.018 0.03 0.24
+    rotation 0 1 0 0
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.15
+          radius 0.03
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation -0.98 -0.01 -0.1
+  children [
+    Transform {
+      translation 0 0.48 0
+      scale 0.004 0.004 0.004
+      children [
+        Shape {
+          appearance PBRAppearance {
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/bishop.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "w_bishop"
+  boundingObject Pose {
+    translation -0.02 0.5 0.19
+    rotation 0 1 0 0
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.15
+          radius 0.03
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation -0.55 -0.01 -0.1
+  children [
+    Transform {
+      translation 0 0.48 0
+      scale 0.004 0.004 0.004
+      children [
+        Shape {
+          appearance PBRAppearance {
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/bishop.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "w_bishop(1)"
+  boundingObject Pose {
+    translation -0.02 0.5 0.19
+    rotation 0 1 0 0
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.15
+          radius 0.03
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation -0.55 -0.99 -0.1
+  children [
+    Transform {
+      translation 0 0.48 0
+      scale 0.004 0.004 0.004
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.607843 0.403922 0.301961
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/bishop.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "b_bishop"
+  boundingObject Pose {
+    translation -0.02 0.5 0.19
+    rotation 0 1 0 0
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.15
+          radius 0.03
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation -0.97 -0.98 -0.1
+  children [
+    Transform {
+      translation 0 0.48 0
+      scale 0.004 0.004 0.004
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.607843 0.403922 0.301961
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/bishop.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "b_bishop(1)"
+  boundingObject Pose {
+    translation -0.02 0.5 0.19
+    rotation 0 1 0 0
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.15
+          radius 0.03
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation -0.28 0.48 -0.07
+  children [
+    Transform {
+      scale 0.003 0.003 0.003
+      children [
+        Shape {
+          appearance PBRAppearance {
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/rook.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "rook"
+  boundingObject Pose {
+    translation -0.01 0.01 0.16
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.15
+          radius 0.04
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation -1.26 0.48 -0.07
+  children [
+    Transform {
+      scale 0.003 0.003 0.003
+      children [
+        Shape {
+          appearance PBRAppearance {
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/rook.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "rook(1)"
+  boundingObject Pose {
+    translation -0.01 0.01 0.16
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.15
+          radius 0.04
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation -1.26 -0.49 -0.07
+  children [
+    Transform {
+      scale 0.003 0.003 0.003
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.607843 0.403922 0.301961
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/rook.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "b_rook(1)"
+  boundingObject Pose {
+    translation -0.01 0.01 0.16
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.15
+          radius 0.04
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation -0.28 -0.5 -0.05
+  children [
+    Transform {
+      scale 0.003 0.003 0.003
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.607843 0.403922 0.301961
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/rook.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "b_rook(2)"
+  boundingObject Pose {
+    translation -0.01 0.01 0.16
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.15
+          radius 0.04
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation -0.84 0.48 -0.07
+  children [
+    Transform {
+      scale 0.003 0.003 0.003
+      children [
+        Shape {
+          appearance PBRAppearance {
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/king.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "king"
+  boundingObject Pose {
+    translation -0.01 0.01 0.17
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.158
+          radius 0.04
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation -0.84 -0.49 -0.07
+  children [
+    Transform {
+      scale 0.003 0.003 0.003
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.607843 0.403922 0.301961
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/king.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "b_king"
+  boundingObject Pose {
+    translation -0.01 0.01 0.17
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.158
+          radius 0.04
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation -0.7 0.48 -0.07
+  children [
+    Transform {
+      scale 0.003 0.003 0.003
+      children [
+        Shape {
+          appearance PBRAppearance {
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/queen.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "queen"
+  boundingObject Pose {
+    translation -0.01 0.01 0.16
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.15
+          radius 0.04
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation -0.71 -0.5 -0.07
+  children [
+    Transform {
+      scale 0.003 0.003 0.003
+      children [
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.607843 0.403922 0.301961
+            roughness 1
+            metalness 0
+          }
+          geometry Mesh {
+            url [
+              "3d_models/queen.stl"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+  name "b_queen"
+  boundingObject Pose {
+    translation -0.01 0.01 0.16
+    children [
+      Shape {
+        geometry Cylinder {
+          height 0.15
+          radius 0.04
+        }
+      }
+    ]
+  }
+  physics Physics {
+    density -1
+    mass 0.3
+  }
+}
+Solid {
+  translation -0.78 0 0
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColorMap ImageTexture {
+          url [
+            "textures/Screenshot 2026-10-22 181945.png"
+          ]
+        }
+        roughness 1
+        metalness 0
+      }
+      geometry Box {
+        size 1.3 1.3 0.02
+      }
+    }
+  ]
+  boundingObject Shape {
+    geometry Box {
+      size 1 1 0.02
+    }
+  }
+  locked TRUE
+}
+UR10e {
+  translation -0.78 -0.929997 0.14
+  rotation 0 0 -1 -5.307179586466759e-06
+  controller "ur10e_chess"
+  supervisor TRUE
+  toolSlot [
+    VacuumGripper {
+      translation 0 -0.01 0
+      children [
+        Pose {
+          translation 0 0.01 0
+          rotation 1 0 0 1.5708
+          children [
+            Shape {
+              appearance PBRAppearance {
+                baseColor 0.1 0.1 0.1
+                roughness 0.9
+                metalness 0.1
+              }
+              geometry Cylinder {
+                height 0.006
+                radius 0.022
+              }
+            }
+          ]
+        }
+      ]
+      boundingObject Pose {
+        translation 0 0.01 -4.89665e-14
+        rotation 1 0 0 1.5708
+        children [
+          Cylinder {
+            height 0.006
+            radius 0.022
+          }
+        ]
+      }
+      physics Physics {
+        density -1
+        mass 0.1
+      }
+      contactPoints 1
+    }
+  ]
+}
+UR10e {
+  translation -0.68 0.870003 0.24
+  rotation 0 0 1 -3.1415853071795863
+  name "UR10e(1)"
+  controller "ur10e_chess"
+  supervisor TRUE
+  toolSlot [
+    VacuumGripper {
+      translation 0 -0.01 0
+      children [
+        Pose {
+          translation 0 0.01 0
+          rotation 1 0 0 1.5708
+          children [
+            Shape {
+              appearance PBRAppearance {
+                baseColor 0.1 0.1 0.1
+                roughness 0.9
+                metalness 0.1
+              }
+              geometry Cylinder {
+                height 0.006
+                radius 0.022
+              }
+            }
+          ]
+        }
+      ]
+      boundingObject Pose {
+        translation 0 0.01 -4.89665e-14
+        rotation 1 0 0 1.5708
+        children [
+          Cylinder {
+            height 0.006
+            radius 0.022
+          }
+        ]
+      }
+      physics Physics {
+        density -1
+        mass 0.1
+      }
+      contactPoints 1
+    }
+  ]
+}
+Robot {
+  translation -0.76 0 1.2
+  rotation 0 1 0 1.57
+  children [
+    Camera {
+      width 1024
+      height 1024
+    }
+  ]
+  controller "camera_power"
+}
+Solid {
+  translation -0.74 -1.17 0.08
+  rotation 0 0 1 4.692820414042842e-06
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.666667 0.333333 0
+        metalness 0
+      }
+      geometry Box {
+        size 0.5 1 0.125
+      }
+    }
+  ]
+  name "base_b"
+  boundingObject Shape {
+    geometry Box {
+      size 0.5 1 0.125
+    }
+  }
+}
+Solid {
+  translation -0.740001 1.2 0.08
+  rotation 0 0 1 4.692820414042842e-06
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0.666667 0.333333 0
+        metalness 0
+      }
+      geometry Box {
+        size 0.5 1 0.125
+      }
+    }
+  ]
+  name "base_w"
+  boundingObject Shape {
+    geometry Box {
+      size 0.5 1 0.125
+    }
+  }
+}

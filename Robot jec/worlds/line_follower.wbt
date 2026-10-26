@@ -1,0 +1,77 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/Floor.proto"
+
+WorldInfo {
+}
+Viewpoint {
+  orientation -0.1760831959731378 0.433342967698097 0.8838600457326329 0.861847473388558
+  position -273.8943125964704 -379.1719874432619 224.37161803376355
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
+Floor {
+  size 500 500
+}
+Solid {
+  translation 0 100 -18.41
+  rotation 1 0 0 1.5708
+  children [
+    Shape {
+      appearance PBRAppearance {
+        baseColor 0 0 0
+        metalness 0
+      }
+      geometry Mesh {
+        url [
+          "../../../../Downloads/Tremendous Kup-Blad/line_design.obj"
+        ]
+      }
+    }
+  ]
+  boundingObject Mesh {
+    url [
+      "../../../../Downloads/Tremendous Kup-Blad/line_design.obj"
+    ]
+  }
+  physics Physics {
+  }
+}
+Solid {
+  children [
+    DEF Body Group {
+      children [
+        Pose {
+          translation 10 30 15
+          children [
+            Shape {
+              appearance PBRAppearance {
+                baseColor 0.0352941 0.219608 0.647059
+              }
+              geometry Box {
+                size 15 15 15
+              }
+            }
+          ]
+        }
+        Shape {
+          appearance PBRAppearance {
+            baseColor 0.431373 0.772549 1
+            metalness 0
+          }
+          geometry Box {
+            size 25 40 25
+          }
+        }
+      ]
+    }
+  ]
+  name "car"
+  boundingObject USE Body
+  physics Physics {
+  }
+}

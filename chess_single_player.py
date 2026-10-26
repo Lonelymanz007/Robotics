@@ -28,6 +28,8 @@ import json
 import time
 import ctypes
 import subprocess
+import atexit
+import signal
 from collections import Counter
 import cv2
 import numpy as np
@@ -651,8 +653,30 @@ def execute_robot_turn(c_engine, board_2d, turn_count, win_2d):
     print(f"🦾 [WEBOTS KINEMATICS] {robot_inst}")
     print(f"📡 [SIM PROTOCOL] {robot_proto}")
 
-    # ส่งข้อมูลคำสั่งไปยัง Webots Simulator
-    emit_webots_instruction(turn_count, "Black", robot_from, robot_to, robot_inst, robot_proto)
+    r_src = square_name_to_rc(robot_from)
+    r_dst = square_name_to_rc(robot_to)
+
+    # ตรวจสอบว่าเป็นการกินหมากหรือไม่ (มีหมากเดิมอยู่ที่ช่องปลายทาง)
+    elim_sq = None
+    if r_dst and board_2d[r_dst[0]][r_dst[1]] is not None:
+        elim_sq = robot_to
+
+    # ตรวจสอบการเข้าป้อมของฝั่งดำ
+    is_castling = False
+    rook_src_sq = None
+    rook_dst_sq = None
+    if r_src and r_dst and board_2d[r_src[0]][r_src[1]] == 'BK' and abs(r_src[1] - r_dst[1]) == 2:
+        is_castling = True
+        if r_dst[1] == 6:
+            rook_src_sq = "h8"; rook_dst_sq = "f8"
+        else:
+            rook_src_sq = "a8"; rook_dst_sq = "d8"
+
+    # ส่งข้อมูลคำสั่งไปยัง Webots Simulator ขยับแขนกลหุ่นยนต์จริงใน Webots ทันที!
+    emit_webots_instruction(
+        turn_count, "Black", robot_from, robot_to, robot_inst, robot_proto,
+        elim_sq=elim_sq, is_castling=is_castling, rook_src=rook_src_sq, rook_dst=rook_dst_sq
+    )
 
     # อนิเมตการเดินของฝั่งดำบนกระดาน 2D
     r_src = square_name_to_rc(robot_from)
@@ -673,6 +697,9 @@ def execute_robot_turn(c_engine, board_2d, turn_count, win_2d):
             animate_move(board_2d, r_src, r_dst, win_2d, is_robot=True)
             board_2d[r_dst[0]][r_dst[1]] = board_2d[r_src[0]][r_src[1]]
             board_2d[r_src[0]][r_src[1]] = None
+
+    # รอให้แขนกลดำใน Webots เดินหมากและกลับสู่ท่าจอดพักให้เสร็จสิ้น 100% (ทำงานทีละตัวเท่านั้น)
+    wait_for_webots_robot("Black", win_2d, board_2d)
 
     turn_count += 1
     # อัปเดตความจำมินิหลังฝั่งดำเดินเสร็จ
@@ -799,8 +826,146 @@ def verify_field_environment(cap, M, dest_size, kernel_open, kernel_dilate, zoom
 
     return True, [], [], "สภาพสนามสมบูรณ์ตรงกับหน่วยความจำ"
 
-# ─── Write Webots Simulation Files ────────────────────────────
-def emit_webots_instruction(move_count, player, from_sq, to_sq, instruction, protocol):
+# ─── Write Webots Simulation Files & Link ─────────────────────
+CONTROLLER_DIRS = [
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "Robot jec", "controllers", "ur10e_chess"),
+    os.path.expanduser("~/Documents/Robot jec/controllers/ur10e_chess")
+]
+WEBOTS_QUEUE_FILE = os.path.join(CONTROLLER_DIRS[0], "webots_queue.json")
+WEBOTS_STATUS_FILE = os.path.join(CONTROLLER_DIRS[0], "webots_status.json")
+
+_webots_cmd_seq = 0
+# รหัสเซสชันของการรันโปรแกรมนี้ ใช้คู่กับ command_id เพื่อไม่ให้ Webots เข้าใจผิดว่าคำสั่งแรกของเกมใหม่เป็นคำสั่งซ้ำ
+_WEBOTS_SESSION_ID = int(time.time() * 1000)
+
+def send_webots_command(cmd_dict):
+    """
+    ส่งคำสั่ง Real-time ไปยัง Webots Controller (ur10e_chess.py)
+    ผ่าน Shared JSON Bridge (webots_queue.json) และ TCP Socket (127.0.0.1:10001)
+    """
+    global _webots_cmd_seq
+    _webots_cmd_seq += 1
+    cmd_dict["command_id"] = _webots_cmd_seq
+    cmd_dict["session"] = _WEBOTS_SESSION_ID
+    cmd_dict["timestamp"] = time.time()
+
+    # 1. บันทึกลง Dedicated Queue File (webots_queue_w.json สำหรับ White, webots_queue_b.json สำหรับ Black)
+    player = cmd_dict.get("player", "").lower()
+    for cdir in CONTROLLER_DIRS:
+        try:
+            if os.path.exists(cdir):
+                if cmd_dict.get("action") in ("RESET", "WIPE", "FLUSH"):
+                    target_qfiles = [
+                        os.path.join(cdir, "webots_queue_w.json"),
+                        os.path.join(cdir, "webots_queue_b.json"),
+                        os.path.join(cdir, "webots_queue.json")
+                    ]
+                elif player.startswith("w"):
+                    target_qfiles = [os.path.join(cdir, "webots_queue_w.json")]
+                else:
+                    target_qfiles = [os.path.join(cdir, "webots_queue_b.json")]
+
+                for qf in target_qfiles:
+                    tmp_f = qf + ".tmp"
+                    with open(tmp_f, "w") as f:
+                        json.dump(cmd_dict, f, indent=2)
+                    os.replace(tmp_f, qf)
+        except Exception as e:
+            pass
+
+    # 2. ส่งผ่าน TCP Socket Localhost ไปยัง Robot Controller ที่เกี่ยวข้อง (10001 สำหรับ Black, 10002 สำหรับ White)
+    try:
+        import socket
+        player = cmd_dict.get("player", "").lower()
+        if cmd_dict.get("action") in ("RESET", "WIPE", "FLUSH"):
+            target_ports = [10001, 10002]
+        elif player.startswith("w"):
+            target_ports = [10002]
+        else:
+            target_ports = [10001]
+
+        for p in target_ports:
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.settimeout(0.08)
+                s.connect(("127.0.0.1", p))
+                payload = json.dumps(cmd_dict) + "\n"
+                s.sendall(payload.encode('utf-8'))
+                s.close()
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+_cleaned_up = False
+
+def wipe_all_webots_commands():
+    """
+    ล้างทุกคำสั่งที่ส่งไปหา Webots ทันทีเมื่อ Terminal หรือหน้าต่าง 2D ปิดตัวลง:
+    1. ส่งคำสั่ง RESET/FLUSH ผ่าน Socket Localhost และ Queue File ทันที
+    2. เขียนทับไฟล์คิวในทุกโฟลเดอร์ controller ให้ว่างเปล่า (action: IDLE)
+    3. ลบไฟล์คำสั่งตกค้างทั้งหมด
+    """
+    global _cleaned_up
+    if _cleaned_up:
+        return
+    _cleaned_up = True
+
+    print("\n🧹 [WIPE] ตรวจพบการปิด Terminal / หน้าต่าง 2D -> กำลังล้างทุกคำสั่งใน Webots ทันที...")
+    cmd = {
+        "action": "WIPE",
+        "instruction": "Terminal/Window closed - flush and cancel all webots commands",
+        "flush": True,
+        "reload_world": False,
+        "timestamp": time.time()
+    }
+    send_webots_command(cmd)
+
+    # เขียนทับคิวในทุกโฟลเดอร์ controller ให้เป็น IDLE ว่างเปล่า
+    for cdir in CONTROLLER_DIRS:
+        try:
+            if os.path.exists(cdir):
+                for qname in ["webots_queue.json", "webots_queue_w.json", "webots_queue_b.json"]:
+                    q_file = os.path.join(cdir, qname)
+                    with open(q_file, "w") as f:
+                        json.dump({"action": "IDLE", "timestamp": time.time()}, f, indent=2)
+        except Exception:
+            pass
+
+    # ลบไฟล์คำสั่งตกค้าง
+    for fpath in [WEBOTS_CMD_FILE, WEBOTS_JSON_FILE]:
+        try:
+            if os.path.exists(fpath):
+                os.remove(fpath)
+        except Exception:
+            pass
+    print("✅ [WIPE] ล้างทุกคำสั่งที่ส่งไปหา Webots เรียบร้อยแล้ว!")
+
+def send_webots_reset(reload_world=True):
+    """ส่งสัญญาณให้ Webots Simulation กลับสู่ Initial State (Reset World & Park Arms)"""
+    cmd = {
+        "action": "RESET",
+        "reload_world": reload_world,
+        "instruction": "Return robot and simulation to initial state"
+    }
+    send_webots_command(cmd)
+
+atexit.register(wipe_all_webots_commands)
+
+def _sig_handler(sig, frame):
+    wipe_all_webots_commands()
+    sys.exit(0)
+
+try:
+    signal.signal(signal.SIGINT, _sig_handler)
+    signal.signal(signal.SIGTERM, _sig_handler)
+    if hasattr(signal, 'SIGHUP'):
+        signal.signal(signal.SIGHUP, _sig_handler)
+except Exception:
+    pass
+
+def emit_webots_instruction(move_count, player, from_sq, to_sq, instruction, protocol,
+                            elim_sq=None, is_castling=False, rook_src=None, rook_dst=None):
     try:
         with open(WEBOTS_CMD_FILE, "a") as f:
             f.write(f"{protocol}\n")
@@ -810,6 +975,10 @@ def emit_webots_instruction(move_count, player, from_sq, to_sq, instruction, pro
             "move": f"{from_sq}{to_sq}",
             "from": from_sq,
             "to": to_sq,
+            "elim": elim_sq,
+            "is_castling": is_castling,
+            "rook_src": rook_src,
+            "rook_dst": rook_dst,
             "instruction": instruction,
             "protocol": protocol,
             "timestamp": time.time()
@@ -818,6 +987,80 @@ def emit_webots_instruction(move_count, player, from_sq, to_sq, instruction, pro
             json.dump(data, f, indent=2)
     except Exception as e:
         print(f"[WEBOTS] Error writing command file: {e}")
+
+    # สั่งให้ Webots UR10e Robot ขยับทันทีแบบ Real-time!
+    cmd = {
+        "action": "MOVE",
+        "turn": move_count,
+        "player": player,
+        "src": from_sq,
+        "dst": to_sq,
+        "elim": elim_sq,
+        "is_castling": is_castling,
+        "rook_src": rook_src,
+        "rook_dst": rook_dst,
+        "instruction": instruction
+    }
+    send_webots_command(cmd)
+    cast_str = f" (Castling Rook {rook_src}->{rook_dst})" if is_castling else ""
+    elim_str = f" (Capture {elim_sq})" if elim_sq else ""
+    print(f"📡 [WEBOTS LINK] สั่ง Webots ขยับแขนกล: {player} {from_sq}->{to_sq}{elim_str}{cast_str}")
+
+def wait_for_webots_robot(player_color, win_2d=None, board_2d=None, timeout=45.0):
+    """
+    รอให้แขนกลใน Webots ทำงานเสร็จสมบูรณ์และกลับสู่ท่าพัก (IDLE)
+    ก่อนที่จะอนุญาตให้อีกฝ่ายเริ่มขยับ เพื่อรับประกันว่าจะทำงานทีละตัวเท่านั้น 100%
+    """
+    tag = "White" if player_color.lower().startswith("w") else "Black"
+    status_suffix = "w" if tag == "White" else "b"
+    print(f"\n⏳ [WEBOTS SYNC] กำลังรอให้แขนกล {tag} เดินหมากใน Webots ให้เสร็จสิ้น (ทำงานทีละตัวเท่านั้น)...")
+
+    time.sleep(0.35)
+    start_wait = time.time()
+    saw_busy = False
+
+    while time.time() - start_wait < timeout:
+        is_busy = False
+        current_stage = "IDLE"
+
+        for cdir in CONTROLLER_DIRS:
+            st_path = os.path.join(cdir, f"webots_status_{status_suffix}.json")
+            if os.path.exists(st_path):
+                try:
+                    with open(st_path, "r") as f:
+                        data = json.load(f)
+                    is_busy = data.get("busy", False)
+                    current_stage = data.get("stage", "IDLE")
+                    break
+                except Exception:
+                    pass
+
+        if is_busy:
+            saw_busy = True
+
+        if win_2d and board_2d is not None:
+            status_text = f"🦾 Webots {tag} Moving ({current_stage})..."
+            canvas = render_board_2d(
+                board_2d,
+                status=status_text,
+                turn_state=f"WEBOTS_{tag.upper()}_MOVING"
+            )
+            cv2.imshow(win_2d, canvas)
+            cv2.waitKey(25)
+        else:
+            time.sleep(0.05)
+
+        if saw_busy and not is_busy and current_stage == "IDLE":
+            print(f"✅ [WEBOTS SYNC] แขนกล {tag} เดินหมากเสร็จสมบูรณ์และกลับสู่ท่าพักเรียบร้อย!")
+            return True
+
+        # ถ้าผ่านไป 3.5 วินาทีแล้วไม่เห็นสัญญาณ busy (เช่น Webots ไม่ได้เปิดอยู่) ให้ไปต่อได้ไม่ค้าง
+        if not saw_busy and (time.time() - start_wait > 3.5):
+            print(f"ℹ️ [WEBOTS SYNC] ไม่พบสัญญาณการเคลื่อนที่จาก Webots (ข้ามการรอ)")
+            return False
+
+    print(f"⚠️ [WEBOTS SYNC] แขนกล {tag} หมดเวลารอ ({timeout}s) -> ดำเนินการต่อ")
+    return False
 
 # ─── Main Single Player Application ───────────────────────────
 def main():
@@ -1138,21 +1381,41 @@ def main():
                         field_alert_squares.clear()
                         print(f"\n👤 [HUMAN MOVE VALID] White played: {moved_p} ({src_sq} -> {dst_sq}) - ถูกต้องตามกฎ!")
 
+                        # 1. ตรวจจับการกินหมากของฝั่งขาว
+                        elim_sq = dst_sq if board_2d[dr][dc] is not None else None
+
                         # 2. อนิเมตหมากขาวบนกระดาน 2D
                         animate_move(board_2d, (sr, sc), (dr, dc), win_2d, is_robot=False)
                         board_2d[dr][dc] = moved_p
                         board_2d[sr][sc] = None
 
                         # 🏰 ตรวจจับการเข้าป้อมของหมากขาว (Castling): ขยับเรือ (Rook) ตามด้วย
+                        is_castling = False
+                        rook_src_sq = None
+                        rook_dst_sq = None
                         if moved_p == 'WK' and abs(sc - dc) == 2:
+                            is_castling = True
                             if dc == 6:  # Kingside (O-O): e1 -> g1, เรือ h1 -> f1
                                 rook_src = (7, 7); rook_dst = (7, 5)
+                                rook_src_sq = "h1"; rook_dst_sq = "f1"
                             else:        # Queenside (O-O-O): e1 -> c1, เรือ a1 -> d1
                                 rook_src = (7, 0); rook_dst = (7, 3)
+                                rook_src_sq = "a1"; rook_dst_sq = "d1"
                             animate_move(board_2d, rook_src, rook_dst, win_2d, is_robot=False)
                             board_2d[rook_dst[0]][rook_dst[1]] = board_2d[rook_src[0]][rook_src[1]]
                             board_2d[rook_src[0]][rook_src[1]] = None
-                            print(f"🏰 [CASTLING] เข้าป้อมสำเร็จ! ย้ายเรือ {rook_src} -> {rook_dst} เรียบร้อย")
+                            print(f"🏰 [CASTLING] เข้าป้อมสำเร็จ! ย้ายเรือ {rook_src_sq} -> {rook_dst_sq} เรียบร้อย")
+
+                        # 3. ส่งคำสั่งไปยัง Webots ให้แขนกล UR10e(1) ฝั่งขาวขยับบนกระดาน 3D ทันที!
+                        white_inst = f"[ACTION 1] GRIPPER: PICK WHITE PIECE AT {src_sq} -> PLACE AT {dst_sq}"
+                        white_proto = f"MOVE {src_sq} {dst_sq}"
+                        emit_webots_instruction(
+                            turn_count, "White", src_sq, dst_sq, white_inst, white_proto,
+                            elim_sq=elim_sq, is_castling=is_castling, rook_src=rook_src_sq, rook_dst=rook_dst_sq
+                        )
+
+                        # รอให้แขนกลขาวใน Webots เดินหมากและกลับสู่ท่าพักให้เสร็จสิ้น 100% ก่อนเปิดทางให้ฝั่งดำ (ทำงานทีละตัวเท่านั้น)
+                        wait_for_webots_robot("White", win_2d, board_2d)
 
                         # 3. บันทึกสถานะสภาพแวดล้อมกระดานล่าสุดลงในระบบความจำมินิ
                         save_mini_memory_state(turn_count, board_2d, last_move=human_move_str, active_turn="Waiting Trigger -> Black (Robot)")
@@ -1239,12 +1502,19 @@ def main():
         cam_h, cam_w = cam_display.shape[:2]
         cv2.imshow(win_cam, cv2.resize(cam_display, (760, int(cam_h * 760 / cam_w))))
 
+        # ตรวจจับว่าผู้ใช้คลิกปุ่มปิดหน้าต่าง (X) บนหน้าต่าง 2D หรือหน้าต่างกล้องหรือไม่
+        if cv2.getWindowProperty(win_2d, cv2.WND_PROP_VISIBLE) < 1 or cv2.getWindowProperty(win_cam, cv2.WND_PROP_VISIBLE) < 1:
+            print("\n🚪 [WINDOW CLOSED] ตรวจพบการปิดหน้าต่าง 2D หรือกล้อง...")
+            break
+
         # Keyboard Controls
         key = cv2.waitKey(1) & 0xFF
         if key == ord('q'):
+            wipe_all_webots_commands()
             break
         elif key == ord('1') or key == ord('r'):
             # Reset Game
+            send_webots_reset()
             live_orient = auto_detect_orientation_from_board(frame, corners)
             if live_orient != orientation:
                 orientation = live_orient
@@ -1377,7 +1647,12 @@ def main():
             calib_clicks.clear()
             print("\n[CALIBRATE] คลิก 4 มุมกระดาน: 1.บนซ้าย -> 2.บนขวา -> 3.ล่างขวา -> 4.ล่างซ้าย")
 
-    cap.release()
+    try:
+        wipe_all_webots_commands()
+    except Exception:
+        pass
+    if cap is not None and cap.isOpened():
+        cap.release()
     cv2.destroyAllWindows()
     print("\n👋 จบการทำงานของระบบ Single Player เรียบร้อยครับ!")
 

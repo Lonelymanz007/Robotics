@@ -1,0 +1,201 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/Floor.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/appearances/protos/Parquetry.proto"
+
+WorldInfo {
+  contactProperties [
+    ContactProperties {
+      coulombFriction [
+        1.5
+      ]
+    }
+  ]
+}
+Viewpoint {
+  orientation -0.11080734493974655 0.10442065953884884 0.9883410636864565 1.6418549867909038
+  position 0.013445284494788108 -0.29241985680536425 0.08623334346413797
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
+Floor {
+  size 10 1
+  appearance Parquetry {
+    type "chequered"
+    colorOverride 0 0 0
+  }
+}
+Solid {
+  translation 0 0.475 0.05
+  children [
+    DEF wall Shape {
+      appearance PBRAppearance {
+        baseColor 0 0.941176 0.690196
+      }
+      geometry Box {
+        size 10 0.05 0.1
+      }
+    }
+  ]
+  name "wall1"
+  boundingObject USE wall
+}
+Solid {
+  translation 0 -0.475 0.05
+  children [
+    DEF wall Shape {
+      appearance PBRAppearance {
+        baseColor 0 0.941176 0.690196
+      }
+      geometry Box {
+        size 10 0.05 0.1
+      }
+    }
+  ]
+  name "wall2"
+  boundingObject USE wall
+}
+Solid {
+  translation 4.9 0 0.05
+  rotation 0 0 1 1.5708
+  children [
+    DEF wall Shape {
+      appearance PBRAppearance {
+        baseColor 0 0.941176 0.690196
+      }
+      geometry Box {
+        size 1 0.05 0.1
+      }
+    }
+  ]
+  name "wall3"
+  boundingObject USE wall
+}
+Solid {
+  translation -4.9 0 0.05
+  rotation 0 0 1 1.5708
+  children [
+    DEF wall Shape {
+      appearance PBRAppearance {
+        baseColor 0 0.941176 0.690196
+      }
+      geometry Box {
+        size 1 0.05 0.1
+      }
+    }
+  ]
+  name "wall4"
+  boundingObject USE wall
+}
+Robot {
+  translation 0 0 0.03
+  children [
+    DEF PENDULUM HingeJoint {
+      jointParameters HingeJointParameters {
+        position 0.1
+        axis 0 1 0
+        anchor 0 -0.025 0.03
+      }
+      device [
+        PositionSensor {
+          name "PENDULUM_SENSOR"
+        }
+      ]
+      endPoint Solid {
+        translation 0.0009983340000000028 -0.025 0.03
+        rotation 0 1 0 0.09999999999999855
+        children [
+          DEF SAO Shape {
+            appearance PBRAppearance {
+            }
+            geometry Box {
+              size 0.01 0.01 0.07
+            }
+          }
+        ]
+        name "solid(1)"
+        boundingObject USE SAO
+        physics Physics {
+        }
+      }
+    }
+    DEF BACK HingeJoint {
+      jointParameters HingeJointParameters {
+        axis 0 1 0
+        anchor -0.03 0 -0.01
+      }
+      device [
+        RotationalMotor {
+          name "BACK_MOTOR"
+        }
+      ]
+      endPoint Solid {
+        translation -0.03 0 -0.01
+        rotation 0 1 0 0
+        children [
+          DEF B_WHEEL Shape {
+            appearance PBRAppearance {
+              roughness 1
+              metalness 0
+            }
+            geometry Sphere {
+              radius 0.015
+              subdivision 2
+            }
+          }
+        ]
+        name "BACK_WHEEL"
+        boundingObject USE B_WHEEL
+        physics Physics {
+        }
+      }
+    }
+    DEF FRONT HingeJoint {
+      jointParameters HingeJointParameters {
+        axis 0 1 0
+        anchor 0.03 0 -0.01
+      }
+      device [
+        RotationalMotor {
+          name "FRONT_MOTOR"
+        }
+      ]
+      endPoint Solid {
+        translation 0.03 0 -0.01
+        rotation 0 1 0 0
+        children [
+          DEF F_WHEEL Shape {
+            appearance PBRAppearance {
+              roughness 1
+              metalness 0
+            }
+            geometry Sphere {
+              radius 0.015
+              subdivision 2
+            }
+          }
+        ]
+        boundingObject USE F_WHEEL
+        physics Physics {
+        }
+      }
+    }
+    DEF BASE Shape {
+      appearance PBRAppearance {
+        baseColor 0.333333 1 1
+        roughness 1
+        metalness 0
+      }
+      geometry Box {
+        size 0.1 0.04 0.041
+      }
+    }
+  ]
+  physics Physics {
+  }
+  controller "final"
+}

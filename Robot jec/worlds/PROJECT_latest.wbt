@@ -1,0 +1,168 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/objects/floors/protos/Floor.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2025a/projects/appearances/protos/Parquetry.proto"
+
+WorldInfo {
+  contactProperties [
+    ContactProperties {
+      coulombFriction [
+        1.5
+      ]
+    }
+  ]
+}
+Viewpoint {
+  orientation -0.2563871868333344 -0.4489962346222164 0.8559602746172049 5.106571970007044
+  position -1.8115277044260754 4.395099696826013 3.187115899874385
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
+Floor {
+  size 2 1
+  appearance Parquetry {
+    type "chequered"
+    colorOverride 0 0 0
+  }
+}
+Solid {
+  translation 0 0.475 0.05
+  children [
+    DEF wall Shape {
+      appearance PBRAppearance {
+        baseColor 0 0.941176 0.690196
+      }
+      geometry Box {
+        size 1.98 0.05 0.1
+      }
+    }
+  ]
+  name "wall1"
+  boundingObject USE wall
+}
+Solid {
+  translation 0 -0.475 0.05
+  children [
+    DEF wall Shape {
+      appearance PBRAppearance {
+        baseColor 0 0.941176 0.690196
+      }
+      geometry Box {
+        size 1.98 0.05 0.1
+      }
+    }
+  ]
+  name "wall2"
+  boundingObject USE wall
+}
+Solid {
+  translation 1.05 0 0.05
+  rotation 0 0 1 1.5708
+  children [
+    DEF wall Shape {
+      appearance PBRAppearance {
+        baseColor 0 0.941176 0.690196
+      }
+      geometry Box {
+        size 1 0.1 0.1
+      }
+    }
+  ]
+  name "wall3"
+  boundingObject USE wall
+}
+Solid {
+  translation -1.05 0 0.05
+  rotation 0 0 1 1.5708
+  children [
+    DEF wall Shape {
+      appearance PBRAppearance {
+        baseColor 0 0.941176 0.690196
+      }
+      geometry Box {
+        size 1 0.1 0.1
+      }
+    }
+  ]
+  name "wall4"
+  boundingObject USE wall
+}
+DEF Robot Robot {
+  translation 0 0 0.025
+  children [
+    DEF body SliderJoint {
+      jointParameters JointParameters {
+        axis 1 0 0
+      }
+      device [
+        PositionSensor {
+          name "cart_sensor"
+        }
+        LinearMotor {
+          name "cart_motor"
+          maxVelocity 300
+          maxForce 40
+        }
+      ]
+      endPoint Solid {
+        translation 1.4646062140855065e-12 -5.008362962586829e-06 -2.2732178878021037e-06
+        rotation 0.19955740705007813 -0.9622417082025517 -0.18511546744365986 2.7743851240681454e-06
+        children [
+          DEF PENDULUM HingeJoint {
+            jointParameters HingeJointParameters {
+              position -1.65
+              axis 0 1 0
+              anchor 0 -0.05 0.03
+            }
+            device [
+              PositionSensor {
+                name "PENDULUM_SENSOR"
+              }
+            ]
+            endPoint Solid {
+              translation -0.00020647899999991746 -0.05 0.2000000000000057
+              rotation 0 -0.9999999999999999 0 0.0022942167110399166
+              children [
+                DEF SAO Shape {
+                  appearance PBRAppearance {
+                    baseColor 0.521569 0.952941 1
+                    metalness 0
+                  }
+                  geometry Box {
+                    size 0.01 0.01 0.4
+                  }
+                }
+              ]
+              name "solid(1)"
+              boundingObject USE SAO
+              physics Physics {
+                density -1
+                mass 0.8
+              }
+            }
+          }
+          DEF S Shape {
+            appearance PBRAppearance {
+              baseColor 1 0.721569 0.984314
+              metalness 0
+            }
+            geometry Box {
+              size 0.15 0.1 0.1
+            }
+          }
+        ]
+        name "solid(2)"
+        boundingObject USE S
+        physics Physics {
+          density -1
+          mass 1
+        }
+      }
+    }
+  ]
+  controller "final"
+}
